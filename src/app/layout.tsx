@@ -26,11 +26,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR" className={`${inter.variable} ${robotoMono.variable}`} suppressHydrationWarning>
       <body className={cn(
-        "min-h-screen bg-background font-sans antialiased",
-        inter.variable,
-        robotoMono.variable
+        "min-h-screen bg-background font-sans antialiased"
       )}>
         {children}
         <Toaster />
