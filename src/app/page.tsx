@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -14,8 +15,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { exportSuitsToCSV } from '@/lib/export';
+import { generateReceiptPDF } from '@/lib/pdfGenerator'; // Import the PDF generator
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BellRing, Edit, Trash2 } from 'lucide-react';
+import { BellRing, Edit, Trash2, FileText } from 'lucide-react';
 import { differenceInCalendarDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -147,6 +149,12 @@ export default function HomePage() {
     toast({ title: "Exportação Bem-sucedida", description: "O catálogo de ternos foi exportado como CSV." });
   };
 
+  const handleGenerateReceipt = (suit: Suit) => {
+    generateReceiptPDF(suit);
+    toast({ title: "Recibo Gerado", description: `O recibo para ${suit.name} foi gerado.` });
+  };
+
+
   if (!isMounted) {
     return (
       <div className="flex flex-col min-h-screen">
@@ -226,17 +234,21 @@ export default function HomePage() {
                       <CardContent className="p-0 text-sm space-y-1">
                         <p><strong>Cliente:</strong> {suit.customerName}</p>
                         <p><strong>Data de Devolução:</strong> <span className="font-semibold text-destructive">{format(parseISO(suit.returnDate!), "PPP", { locale: ptBR })}</span> ({getDaysRemainingText(suit.returnDate)})</p>
+                        <p><strong>Preço do Aluguel:</strong> R$ {suit.rentalPrice.toFixed(2)}</p>
                         {suit.customerPhone && <p><strong>Telefone:</strong> {suit.customerPhone}</p>}
                         {suit.customerEmail && <p><strong>Email:</strong> {suit.customerEmail}</p>}
                         {suit.observations && <p className="mt-1 text-xs"><strong>Obs:</strong> {suit.observations}</p>}
                       </CardContent>
                     </div>
-                    <div className="mt-3 sm:mt-0 flex sm:flex-col gap-2 flex-shrink-0">
+                    <div className="mt-3 sm:mt-0 flex flex-col gap-2 flex-shrink-0 self-start sm:self-center">
                          <Button variant="outline" size="sm" onClick={() => handleEditSuit(suit)} className="w-full sm:w-auto">
                             <Edit className="mr-1 h-4 w-4" /> Editar
                          </Button>
                          <Button variant="destructive" size="sm" onClick={() => handleDeleteSuit(suit.id)} className="w-full sm:w-auto">
                              <Trash2 className="mr-1 h-4 w-4" /> Excluir
+                         </Button>
+                         <Button variant="outline" size="sm" onClick={() => handleGenerateReceipt(suit)} className="w-full sm:w-auto">
+                            <FileText className="mr-1 h-4 w-4" /> Gerar Recibo
                          </Button>
                     </div>
                   </Card>

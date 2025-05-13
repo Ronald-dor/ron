@@ -1,9 +1,11 @@
+
 import Image from 'next/image';
 import type { Suit } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, CalendarDays, Edit, Trash2, ImageOff } from 'lucide-react';
+import { DollarSign, CalendarDays, Edit, Trash2, ImageOff, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { generateReceiptPDF } from '@/lib/pdfGenerator'; // Import the PDF generator
 
 type SuitCardProps = {
   suit: Suit;
@@ -12,6 +14,14 @@ type SuitCardProps = {
 };
 
 export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
+  const isRented = !!suit.customerName && !!suit.deliveryDate && !!suit.returnDate;
+
+  const handleGenerateReceipt = () => {
+    if (isRented) {
+      generateReceiptPDF(suit);
+    }
+  };
+
   return (
     <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
       <CardHeader className="p-0 relative">
@@ -24,10 +34,7 @@ export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
               objectFit="cover"
               data-ai-hint="suit fashion photo"
               onError={(e) => {
-                // Fallback if image fails to load, e.g., hide or show placeholder
                 (e.target as HTMLImageElement).style.display = 'none'; 
-                // Ideally, you'd have a more robust way to show the ImageOff icon here
-                // For now, hiding the broken image is a simple solution.
               }}
             />
           ) : (
@@ -35,8 +42,7 @@ export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
               <ImageOff className="w-16 h-16 text-muted-foreground" />
             </div>
           )}
-           {/* This ensures ImageOff shows if photoUrl is empty or if Image above fails and hides */}
-          {!suit.photoUrl && (
+           {!suit.photoUrl && (
              <div className="absolute inset-0 flex items-center justify-center h-full">
               <ImageOff className="w-16 h-16 text-muted-foreground" />
             </div>
@@ -48,10 +54,10 @@ export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
         <CardDescription className="text-sm text-muted-foreground mb-2">Código: {suit.code}</CardDescription>
         
         <div className="flex items-center text-lg font-semibold text-primary mb-2">
-          <DollarSign className="mr-2 h-5 w-5" /> {suit.rentalPrice.toFixed(2)} / aluguel
+          <DollarSign className="mr-2 h-5 w-5" /> R$ {suit.rentalPrice.toFixed(2)} / aluguel
         </div>
         <div className="text-xs text-muted-foreground mb-1">
-          Preço do Terno: R${suit.suitPrice.toFixed(2)}
+          Preço do Terno: R$ {suit.suitPrice.toFixed(2)}
         </div>
         <div className="flex items-center text-xs text-muted-foreground mb-2">
           <CalendarDays className="mr-1 h-3 w-3" /> Comprado em: {new Date(suit.purchaseDate).toLocaleDateString('pt-BR')}
@@ -64,13 +70,18 @@ export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
            <p className="text-xs text-muted-foreground mt-1">Devolução: {new Date(suit.returnDate).toLocaleDateString('pt-BR')}</p>
         )}
       </CardContent>
-      <CardFooter className="p-4 border-t">
-        <Button variant="outline" size="sm" onClick={() => onEdit(suit)} className="mr-2">
+      <CardFooter className="p-4 border-t flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => onEdit(suit)} className="flex-grow sm:flex-grow-0">
           <Edit className="mr-1 h-4 w-4" /> Editar
         </Button>
-        <Button variant="destructive" size="sm" onClick={() => onDelete(suit.id)}>
+        <Button variant="destructive" size="sm" onClick={() => onDelete(suit.id)} className="flex-grow sm:flex-grow-0">
           <Trash2 className="mr-1 h-4 w-4" /> Excluir
         </Button>
+        {isRented && (
+          <Button variant="outline" size="sm" onClick={handleGenerateReceipt} className="flex-grow sm:flex-grow-0 w-full sm:w-auto">
+            <FileText className="mr-1 h-4 w-4" /> Gerar Recibo
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );
