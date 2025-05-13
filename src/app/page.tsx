@@ -244,11 +244,11 @@ export default function HomePage() {
                          <Button variant="outline" size="sm" onClick={() => handleEditSuit(suit)} className="w-full sm:w-auto">
                             <Edit className="mr-1 h-4 w-4" /> Editar
                          </Button>
-                         <Button variant="destructive" size="sm" onClick={() => handleDeleteSuit(suit.id)} className="w-full sm:w-auto">
-                             <Trash2 className="mr-1 h-4 w-4" /> Excluir
-                         </Button>
                          <Button variant="outline" size="sm" onClick={() => handleGenerateReceipt(suit)} className="w-full sm:w-auto">
                             <FileText className="mr-1 h-4 w-4" /> Gerar Recibo
+                         </Button>
+                         <Button variant="destructive" size="sm" onClick={() => handleDeleteSuit(suit.id)} className="w-full sm:w-auto">
+                             <Trash2 className="mr-1 h-4 w-4" /> Excluir
                          </Button>
                     </div>
                   </Card>

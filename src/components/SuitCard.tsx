@@ -74,14 +74,14 @@ export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
         <Button variant="outline" size="sm" onClick={() => onEdit(suit)} className="flex-grow sm:flex-grow-0">
           <Edit className="mr-1 h-4 w-4" /> Editar
         </Button>
-        <Button variant="destructive" size="sm" onClick={() => onDelete(suit.id)} className="flex-grow sm:flex-grow-0">
-          <Trash2 className="mr-1 h-4 w-4" /> Excluir
-        </Button>
         {isRented && (
           <Button variant="outline" size="sm" onClick={handleGenerateReceipt} className="flex-grow sm:flex-grow-0 w-full sm:w-auto">
             <FileText className="mr-1 h-4 w-4" /> Gerar Recibo
           </Button>
         )}
+        <Button variant="destructive" size="sm" onClick={() => onDelete(suit.id)} className="flex-grow sm:flex-grow-0">
+          <Trash2 className="mr-1 h-4 w-4" /> Excluir
+        </Button>
       </CardFooter>
     </Card>
   );
