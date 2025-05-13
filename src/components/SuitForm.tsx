@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 const suitFormSchema = z.object({
   name: z.string().min(3, { message: "O nome deve ter pelo menos 3 caracteres." }),
   code: z.string().min(1, { message: "O código é obrigatório." }),
-  photoUrl: z.string().optional(), 
+  photoUrl: z.string().optional(),
   purchaseDate: z.date({ required_error: "A data da compra é obrigatória." }),
   suitPrice: z.coerce.number().min(0, { message: "O preço do terno deve ser positivo." }),
   rentalPrice: z.coerce.number().min(0, { message: "O preço do aluguel deve ser positivo." }),
@@ -45,61 +45,63 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const defaultValues = initialData
-    ? {
-        ...initialData,
-        photoUrl: initialData.photoUrl || "",
-        purchaseDate: initialData.purchaseDate ? parseISO(initialData.purchaseDate) : new Date(),
-        deliveryDate: initialData.deliveryDate ? parseISO(initialData.deliveryDate) : undefined,
-        returnDate: initialData.returnDate ? parseISO(initialData.returnDate) : undefined,
-      }
-    : {
-        name: "",
-        code: "",
-        photoUrl: "",
-        purchaseDate: new Date(),
-        suitPrice: 0,
-        rentalPrice: 0,
-        observations: "",
-        customerName: "",
-        customerPhone: "",
-        customerEmail: "",
-      };
+  const memoizedDefaultValues = React.useMemo(() => {
+    return initialData
+      ? {
+          ...initialData,
+          photoUrl: initialData.photoUrl || "",
+          purchaseDate: initialData.purchaseDate ? parseISO(initialData.purchaseDate) : new Date(),
+          deliveryDate: initialData.deliveryDate ? parseISO(initialData.deliveryDate) : undefined,
+          returnDate: initialData.returnDate ? parseISO(initialData.returnDate) : undefined,
+        }
+      : {
+          name: "",
+          code: "",
+          photoUrl: "",
+          purchaseDate: new Date(),
+          suitPrice: 0,
+          rentalPrice: 0,
+          observations: "",
+          customerName: "",
+          customerPhone: "",
+          customerEmail: "",
+        };
+  }, [initialData]);
 
   const form = useForm<SuitFormValues>({
     resolver: zodResolver(suitFormSchema),
-    defaultValues,
+    defaultValues: memoizedDefaultValues,
   });
 
-  React.useEffect(() => { // Reset form if initialData changes (e.g. opening dialog for different suit)
-    form.reset(defaultValues);
+  React.useEffect(() => {
+    form.reset(memoizedDefaultValues);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [initialData, form, defaultValues]);
+  }, [memoizedDefaultValues, form.reset]);
 
 
   const handleSubmit = (data: SuitFormValues) => {
     const submittedSuit: Suit = {
       ...data,
       id: initialData?.id || crypto.randomUUID(),
-      photoUrl: data.photoUrl || "", 
+      photoUrl: data.photoUrl || "",
       purchaseDate: format(data.purchaseDate, "yyyy-MM-dd"),
       deliveryDate: data.deliveryDate ? format(data.deliveryDate, "yyyy-MM-dd") : undefined,
       returnDate: data.returnDate ? format(data.returnDate, "yyyy-MM-dd") : undefined,
     };
     onSubmit(submittedSuit);
     if (fileInputRef.current) {
-        fileInputRef.current.value = ""; 
+        fileInputRef.current.value = "";
     }
   };
 
   const handleCancel = () => {
     onCancel();
     if (fileInputRef.current) {
-        fileInputRef.current.value = ""; 
+        fileInputRef.current.value = "";
     }
-    form.reset(defaultValues); 
+    form.reset(memoizedDefaultValues);
   };
 
   return (
@@ -129,7 +131,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
             )}
           />
         </div>
-        
+
         <FormField
           control={form.control}
           name="photoUrl"
@@ -149,19 +151,17 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                         field.onChange(reader.result as string);
                       };
                       reader.onerror = () => {
-                        // Keep existing photoUrl if upload fails during edit, or clear if new
-                        field.onChange(initialData?.photoUrl || ""); 
+                        field.onChange(initialData?.photoUrl || memoizedDefaultValues.photoUrl || "");
                         toast({ variant: "destructive", title: "Erro de Upload", description: "Não foi possível carregar a imagem." });
                       }
                       reader.readAsDataURL(file);
                     } else {
-                       // If user cancels file dialog, revert to previous value (initial or empty)
-                      field.onChange(defaultValues.photoUrl);
+                      field.onChange(memoizedDefaultValues.photoUrl || "");
                     }
                   }}
                 />
               </FormControl>
-              {field.value && ( // Show preview if photoUrl has a value (Data URI or web URL)
+              {field.value && (
                 <div className="mt-2">
                   <Image
                     src={field.value}
@@ -170,9 +170,8 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                     height={125}
                     className="rounded-md object-cover aspect-[3/4]"
                     data-ai-hint="suit preview"
-                    onError={(e) => { 
-                        // Hide image on error, user can try uploading again
-                        (e.target as HTMLImageElement).style.display = 'none'; 
+                    onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
                         toast({variant: "destructive", title: "Erro de Visualização", description: "Não foi possível exibir a imagem de pré-visualização."})
                     }}
                   />
@@ -243,7 +242,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
             )}
           />
         </div>
-        
+
         <h3 className="text-lg font-medium border-t pt-4 mt-6">Informações do Aluguel (Opcional)</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
