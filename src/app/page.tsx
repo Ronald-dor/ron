@@ -22,9 +22,9 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // In a real app, fetch data here. For now, use mock data.
     // Simulating data load and giving unique IDs if they are missing for mock data
-    setSuits(mockSuits.map(suit => ({ ...suit, id: suit.id || crypto.randomUUID() })));
+    // Ensuring photoUrl is always at least an empty string for consistency
+    setSuits(mockSuits.map(suit => ({ ...suit, id: suit.id || crypto.randomUUID(), photoUrl: suit.photoUrl || "" })));
   }, []);
 
   const handleAddSuit = () => {
@@ -44,18 +44,21 @@ export default function HomePage() {
   const confirmDeleteSuit = () => {
     if (suitToDelete) {
       setSuits(prevSuits => prevSuits.filter(suit => suit.id !== suitToDelete));
-      toast({ title: "Suit Deleted", description: "The suit has been removed from the catalog." });
+      toast({ title: "Terno Excluído", description: "O terno foi removido do catálogo." });
     }
     setSuitToDelete(null);
   };
 
   const handleFormSubmit = (suitData: Suit) => {
+    // Ensure photoUrl is always a string, defaulting to empty if undefined/null from form
+    const processedSuitData = { ...suitData, photoUrl: suitData.photoUrl || "" };
+
     if (editingSuit) {
-      setSuits(prevSuits => prevSuits.map(s => (s.id === suitData.id ? suitData : s)));
-      toast({ title: "Suit Updated", description: `${suitData.name} has been updated.` });
+      setSuits(prevSuits => prevSuits.map(s => (s.id === processedSuitData.id ? processedSuitData : s)));
+      toast({ title: "Terno Atualizado", description: `${processedSuitData.name} foi atualizado.` });
     } else {
-      setSuits(prevSuits => [...prevSuits, { ...suitData, id: crypto.randomUUID() }]);
-      toast({ title: "Suit Added", description: `${suitData.name} has been added to the catalog.` });
+      setSuits(prevSuits => [...prevSuits, { ...processedSuitData, id: crypto.randomUUID() }]);
+      toast({ title: "Terno Adicionado", description: `${processedSuitData.name} foi adicionado ao catálogo.` });
     }
     setIsFormOpen(false);
     setEditingSuit(null);
@@ -63,20 +66,19 @@ export default function HomePage() {
 
   const handleExportCSV = () => {
     if (suits.length === 0) {
-      toast({ title: "Export Catalog", description: "Catalog is empty. Nothing to export.", variant: "destructive" });
+      toast({ title: "Exportar Catálogo", description: "O catálogo está vazio. Nada para exportar.", variant: "destructive" });
       return;
     }
     exportSuitsToCSV(suits);
-    toast({ title: "Export Successful", description: "Suit catalog has been exported as CSV." });
+    toast({ title: "Exportação Bem-sucedida", description: "O catálogo de ternos foi exportado como CSV." });
   };
 
   if (!isMounted) {
-    // Optional: return a loading skeleton or null to avoid hydration mismatch for client-side only data
     return (
       <div className="flex flex-col min-h-screen">
         <AppHeader onAddSuit={() => {}} onExportCSV={() => {}} />
         <main className="flex-grow container mx-auto px-4 py-8">
-          <p>Loading catalog...</p>
+          <p>Carregando catálogo...</p>
         </main>
       </div>
     );
@@ -88,8 +90,8 @@ export default function HomePage() {
       <main className="flex-grow container mx-auto px-4 py-8">
         {suits.length === 0 ? (
           <div className="text-center py-10">
-            <h2 className="text-2xl font-semibold text-muted-foreground">Your catalog is empty.</h2>
-            <p className="text-muted-foreground mt-2">Click "Add Suit" to start building your collection.</p>
+            <h2 className="text-2xl font-semibold text-muted-foreground">Seu catálogo está vazio.</h2>
+            <p className="text-muted-foreground mt-2">Clique em "Adicionar Terno" para começar a montar sua coleção.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -102,19 +104,21 @@ export default function HomePage() {
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
           setIsFormOpen(isOpen);
-          if (!isOpen) setEditingSuit(null);
+          if (!isOpen) {
+            setEditingSuit(null);
+          }
         }}>
         <DialogContent className="sm:max-w-[425px] md:max-w-[700px] lg:max-w-[900px]">
           <DialogHeader>
-            <DialogTitle>{editingSuit ? 'Edit Suit' : 'Add New Suit'}</DialogTitle>
+            <DialogTitle>{editingSuit ? 'Editar Terno' : 'Adicionar Novo Terno'}</DialogTitle>
             <DialogDescription>
-              {editingSuit ? 'Update the details of this suit.' : 'Enter the details for the new suit.'}
+              {editingSuit ? 'Atualize os detalhes deste terno.' : 'Insira os detalhes para o novo terno.'}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] pr-6">
             <SuitForm
               onSubmit={handleFormSubmit}
-              initialData={editingSuit}
+              initialData={editingSuit} // Pass null or Suit object
               onCancel={() => {
                 setIsFormOpen(false);
                 setEditingSuit(null);
@@ -127,14 +131,14 @@ export default function HomePage() {
       <AlertDialog open={!!suitToDelete} onOpenChange={() => setSuitToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the suit from the catalog.
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente o terno do catálogo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setSuitToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteSuit}>Delete</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setSuitToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteSuit}>Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

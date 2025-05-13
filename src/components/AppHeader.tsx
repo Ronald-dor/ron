@@ -14,15 +14,15 @@ export function AppHeader({ onAddSuit, onExportCSV }: AppHeaderProps) {
         <div className="flex items-center gap-2">
           <AppLogo className="h-8 w-8 text-primary" />
           <h1 className="text-2xl font-bold tracking-tight text-primary">
-            SuitUp Rental
+            SuitUp Aluguel
           </h1>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={onAddSuit} variant="outline">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Suit
+            <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Terno
           </Button>
           <Button onClick={onExportCSV}>
-            <Download className="mr-2 h-4 w-4" /> Export Catalog
+            <Download className="mr-2 h-4 w-4" /> Exportar Catálogo
           </Button>
         </div>
       </div>

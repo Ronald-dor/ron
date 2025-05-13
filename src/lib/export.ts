@@ -1,16 +1,14 @@
 import type { Suit } from '@/types';
 
 export function exportSuitsToCSV(suits: Suit[]) {
-  // Fields for export as per user request:
-  // "foto do terno, nome, valor do terno, valor do aluguel, data da compra, data da devolução, código"
   const headers = [
-    'Code',        // código
-    'Name',        // nome
-    'Photo URL',   // foto do terno
-    'Purchase Date',// data da compra
-    'Suit Price',  // valor do terno
-    'Rental Price',// valor do aluguel
-    'Return Date', // data da devolução
+    'Código',
+    'Nome',
+    'Foto URL', 
+    'Data da Compra',
+    'Valor do Terno',
+    'Valor do Aluguel',
+    'Data da Devolução',
   ];
 
   const csvRows = [headers.join(',')];
@@ -19,14 +17,14 @@ export function exportSuitsToCSV(suits: Suit[]) {
     const row = [
       suit.code,
       suit.name,
-      suit.photoUrl,
+      suit.photoUrl, 
       suit.purchaseDate,
       suit.suitPrice,
       suit.rentalPrice,
-      suit.returnDate || '', // Handle optional field
+      suit.returnDate || '', 
     ].map(value => {
-      const stringValue = String(value ?? ''); // Ensure value is a string, handle null/undefined
-      return `"${stringValue.replace(/"/g, '""')}"`; // Escape double quotes
+      const stringValue = String(value ?? ''); 
+      return `"${stringValue.replace(/"/g, '""')}"`;
     });
     csvRows.push(row.join(','));
   });
@@ -34,13 +32,14 @@ export function exportSuitsToCSV(suits: Suit[]) {
   const csvString = csvRows.join('\n');
   const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
+  const filename = 'catalogo_ternos.csv';
   
-  if (navigator.msSaveBlob) { // For IE 10+
-    navigator.msSaveBlob(blob, 'suit_catalog.csv');
+  if (navigator.msSaveBlob) { 
+    navigator.msSaveBlob(blob, filename);
   } else {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', 'suit_catalog.csv');
+    link.setAttribute('download', filename);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

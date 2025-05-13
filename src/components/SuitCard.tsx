@@ -18,14 +18,26 @@ export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
         <div className="aspect-[3/4] w-full relative bg-muted">
           {suit.photoUrl ? (
             <Image
-              src={suit.photoUrl}
+              src={suit.photoUrl} // Handles both Data URIs and web URLs
               alt={suit.name}
               layout="fill"
               objectFit="cover"
               data-ai-hint="suit fashion photo"
+              onError={(e) => {
+                // Fallback if image fails to load, e.g., hide or show placeholder
+                (e.target as HTMLImageElement).style.display = 'none'; 
+                // Ideally, you'd have a more robust way to show the ImageOff icon here
+                // For now, hiding the broken image is a simple solution.
+              }}
             />
           ) : (
             <div className="flex items-center justify-center h-full">
+              <ImageOff className="w-16 h-16 text-muted-foreground" />
+            </div>
+          )}
+           {/* This ensures ImageOff shows if photoUrl is empty or if Image above fails and hides */}
+          {!suit.photoUrl && (
+             <div className="absolute inset-0 flex items-center justify-center h-full">
               <ImageOff className="w-16 h-16 text-muted-foreground" />
             </div>
           )}
@@ -33,31 +45,31 @@ export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
       </CardHeader>
       <CardContent className="p-4 flex-grow">
         <CardTitle className="text-xl mb-1">{suit.name}</CardTitle>
-        <CardDescription className="text-sm text-muted-foreground mb-2">Code: {suit.code}</CardDescription>
+        <CardDescription className="text-sm text-muted-foreground mb-2">Código: {suit.code}</CardDescription>
         
         <div className="flex items-center text-lg font-semibold text-primary mb-2">
-          <DollarSign className="mr-2 h-5 w-5" /> {suit.rentalPrice.toFixed(2)} / rental
+          <DollarSign className="mr-2 h-5 w-5" /> {suit.rentalPrice.toFixed(2)} / aluguel
         </div>
         <div className="text-xs text-muted-foreground mb-1">
-          Suit Price: ${suit.suitPrice.toFixed(2)}
+          Preço do Terno: R${suit.suitPrice.toFixed(2)}
         </div>
         <div className="flex items-center text-xs text-muted-foreground mb-2">
-          <CalendarDays className="mr-1 h-3 w-3" /> Purchased: {new Date(suit.purchaseDate).toLocaleDateString()}
+          <CalendarDays className="mr-1 h-3 w-3" /> Comprado em: {new Date(suit.purchaseDate).toLocaleDateString('pt-BR')}
         </div>
 
         {suit.customerName && (
-          <Badge variant="secondary" className="mt-2">Rented by: {suit.customerName}</Badge>
+          <Badge variant="secondary" className="mt-2">Alugado por: {suit.customerName}</Badge>
         )}
         {suit.returnDate && (
-           <p className="text-xs text-muted-foreground mt-1">Return: {new Date(suit.returnDate).toLocaleDateString()}</p>
+           <p className="text-xs text-muted-foreground mt-1">Devolução: {new Date(suit.returnDate).toLocaleDateString('pt-BR')}</p>
         )}
       </CardContent>
       <CardFooter className="p-4 border-t">
         <Button variant="outline" size="sm" onClick={() => onEdit(suit)} className="mr-2">
-          <Edit className="mr-1 h-4 w-4" /> Edit
+          <Edit className="mr-1 h-4 w-4" /> Editar
         </Button>
         <Button variant="destructive" size="sm" onClick={() => onDelete(suit.id)}>
-          <Trash2 className="mr-1 h-4 w-4" /> Delete
+          <Trash2 className="mr-1 h-4 w-4" /> Excluir
         </Button>
       </CardFooter>
     </Card>
