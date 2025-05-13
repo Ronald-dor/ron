@@ -234,7 +234,7 @@ export default function HomePage() {
                       <CardContent className="p-0 text-sm space-y-1">
                         <p><strong>Cliente:</strong> {suit.customerName}</p>
                         <p><strong>Data de Devolução:</strong> <span className="font-semibold text-destructive">{format(parseISO(suit.returnDate!), "PPP", { locale: ptBR })}</span> ({getDaysRemainingText(suit.returnDate)})</p>
-                        <p><strong>Preço do Aluguel:</strong> R$ {suit.rentalPrice.toFixed(2)}</p>
+                        <p><strong>Preço do Aluguel:</strong> R$ {suit.rentalPrice.toFixed(2).replace('.', ',')}</p>
                         {suit.customerPhone && <p><strong>Telefone:</strong> {suit.customerPhone}</p>}
                         {suit.customerEmail && <p><strong>Email:</strong> {suit.customerEmail}</p>}
                         {suit.observations && <p className="mt-1 text-xs"><strong>Obs:</strong> {suit.observations}</p>}

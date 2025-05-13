@@ -31,7 +31,7 @@ export function generateReceiptPDF(suit: Suit) {
     head: [['Detalhe do Aluguel', 'Informação']],
     body: [
       ['Terno', `${suit.name} (Cód: ${suit.code})`],
-      ['Preço do Aluguel', `R$ ${suit.rentalPrice.toFixed(2)}`],
+      ['Preço do Aluguel', `R$ ${suit.rentalPrice.toFixed(2).replace('.', ',')}`],
       ['Cliente', suit.customerName || 'N/A'],
       ['Telefone do Cliente', suit.customerPhone || 'N/A'],
       ['Email do Cliente', suit.customerEmail || 'N/A'],

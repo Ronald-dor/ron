@@ -3,7 +3,7 @@ import Image from 'next/image';
 import type { Suit } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, CalendarDays, Edit, Trash2, ImageOff, FileText } from 'lucide-react';
+import { CalendarDays, Edit, Trash2, ImageOff, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { generateReceiptPDF } from '@/lib/pdfGenerator'; // Import the PDF generator
 
@@ -53,11 +53,11 @@ export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
         <CardTitle className="text-xl mb-1">{suit.name}</CardTitle>
         <CardDescription className="text-sm text-muted-foreground mb-2">Código: {suit.code}</CardDescription>
         
-        <div className="flex items-center text-lg font-semibold text-primary mb-2">
-          <DollarSign className="mr-2 h-5 w-5" /> R$ {suit.rentalPrice.toFixed(2)} / aluguel
+        <div className="text-lg font-semibold text-primary mb-2">
+           R$ {suit.rentalPrice.toFixed(2).replace('.', ',')} / aluguel
         </div>
         <div className="text-xs text-muted-foreground mb-1">
-          Preço do Terno: R$ {suit.suitPrice.toFixed(2)}
+          Preço do Terno: R$ {suit.suitPrice.toFixed(2).replace('.', ',')}
         </div>
         <div className="flex items-center text-xs text-muted-foreground mb-2">
           <CalendarDays className="mr-1 h-3 w-3" /> Comprado em: {new Date(suit.purchaseDate).toLocaleDateString('pt-BR')}
