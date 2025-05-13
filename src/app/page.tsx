@@ -9,11 +9,13 @@ import { SuitCard } from '@/components/SuitCard';
 import { SuitForm } from '@/components/SuitForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Card, CardContent, CardHeader, CardTitle as ReminderCardTitle } from '@/components/ui/card'; // Renamed to avoid conflict
+import { Card, CardContent, CardHeader, CardTitle as ReminderCardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { exportSuitsToCSV } from '@/lib/export';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BellRing } from 'lucide-react';
+import { BellRing, Edit, Trash2 } from 'lucide-react';
 import { differenceInCalendarDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -27,26 +29,27 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
+    // Ensure mockSuits are properly initialized with potentially undefined rental fields
     setSuits(mockSuits.map(suit => ({ 
       ...suit, 
       id: suit.id || crypto.randomUUID(), 
       photoUrl: suit.photoUrl || "",
-      // Ensure customer fields are at least empty strings if not present in mock data
-      customerName: suit.customerName || "",
-      customerPhone: suit.customerPhone || "",
-      customerEmail: suit.customerEmail || "",
+      customerName: suit.customerName || undefined,
+      customerPhone: suit.customerPhone || undefined,
+      customerEmail: suit.customerEmail || undefined,
+      deliveryDate: suit.deliveryDate || undefined,
+      returnDate: suit.returnDate || undefined,
+      observations: suit.observations || undefined,
     })));
   }, []);
 
-  const upcomingReturnSuits = useMemo(() => {
+  const upcomingReturnSuitsForNotification = useMemo(() => {
     if (!isMounted) return [];
-  
     const today = new Date();
     today.setHours(0, 0, 0, 0);
   
     return suits.filter(suit => {
       if (!suit.returnDate || !suit.customerName) return false; 
-  
       try {
         const returnDateObj = parseISO(suit.returnDate);
         const diffInDays = differenceInCalendarDays(returnDateObj, today);
@@ -57,6 +60,41 @@ export default function HomePage() {
       }
     });
   }, [suits, isMounted]);
+
+  const upcomingReturnSuitsForTab = useMemo(() => {
+    if (!isMounted) return [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return suits
+        .filter(suit => {
+            if (!suit.returnDate || !suit.customerName) return false;
+            try {
+                const returnDateObj = parseISO(suit.returnDate);
+                const diffInDays = differenceInCalendarDays(returnDateObj, today);
+                return diffInDays >= 0 && diffInDays <= 7; // Due in the next 7 days (inclusive of today)
+            } catch (e) {
+                console.error("Erro ao analisar data de devolução para aba:", suit.returnDate, e);
+                return false;
+            }
+        })
+        .sort((a, b) => parseISO(a.returnDate!).getTime() - parseISO(b.returnDate!).getTime());
+  }, [suits, isMounted]);
+
+
+  const getDaysRemainingText = (returnDateStr: string | undefined): string => {
+    if (!returnDateStr) return "";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const returnDateObj = parseISO(returnDateStr);
+    const diff = differenceInCalendarDays(returnDateObj, today);
+
+    if (diff < 0) return `Atrasado (${Math.abs(diff)} dia${Math.abs(diff) !== 1 ? 's' : ''})`;
+    if (diff === 0) return 'Hoje';
+    if (diff === 1) return 'Amanhã';
+    return `Em ${diff} dias`;
+  };
+
 
   const handleAddSuit = () => {
     setEditingSuit(null);
@@ -81,20 +119,19 @@ export default function HomePage() {
   };
 
   const handleFormSubmit = (suitData: Suit) => {
-    const processedSuitData = { 
+    const processedSuitData: Suit = { 
       ...suitData, 
+      id: suitData.id || crypto.randomUUID(), // Ensure ID is present
       photoUrl: suitData.photoUrl || "",
-      // Ensure customer fields from form are passed
-      customerName: suitData.customerName,
-      customerPhone: suitData.customerPhone,
-      customerEmail: suitData.customerEmail,
+      // The suitData from form already has fields as string or undefined based on Zod transform
+      // and date fields are formatted to string YYYY-MM-DD or undefined
     };
 
     if (editingSuit) {
       setSuits(prevSuits => prevSuits.map(s => (s.id === processedSuitData.id ? processedSuitData : s)));
       toast({ title: "Terno Atualizado", description: `${processedSuitData.name} foi atualizado.` });
     } else {
-      setSuits(prevSuits => [...prevSuits, { ...processedSuitData, id: crypto.randomUUID() }]);
+      setSuits(prevSuits => [...prevSuits, processedSuitData]);
       toast({ title: "Terno Adicionado", description: `${processedSuitData.name} foi adicionado ao catálogo.` });
     }
     setIsFormOpen(false);
@@ -125,18 +162,18 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader onAddSuit={handleAddSuit} onExportCSV={handleExportCSV} />
       <main className="flex-grow container mx-auto px-4 py-8">
-        {isMounted && upcomingReturnSuits.length > 0 && (
+        {isMounted && upcomingReturnSuitsForNotification.length > 0 && (
           <div className="mb-8 p-4 border rounded-lg shadow-md bg-card">
             <h2 className="text-xl font-semibold mb-4 text-primary flex items-center">
               <BellRing className="mr-2 h-5 w-5" /> Lembretes de Devolução (Hoje ou Amanhã)
             </h2>
             <div className="space-y-3">
-              {upcomingReturnSuits.map(suit => (
+              {upcomingReturnSuitsForNotification.map(suit => (
                 <Card key={`reminder-${suit.id}`} className="p-4 bg-secondary/20">
                   <ReminderCardTitle className="text-md font-semibold mb-1">{suit.name} <span className="text-sm font-normal text-muted-foreground">(Cód: {suit.code})</span></ReminderCardTitle>
                   <CardContent className="p-0 text-sm space-y-0.5">
                     <p><strong>Cliente:</strong> {suit.customerName}</p>
-                    <p><strong>Data de Devolução:</strong> <span className="font-semibold text-destructive">{format(parseISO(suit.returnDate!), "PPP", { locale: ptBR })}</span></p>
+                    <p><strong>Data de Devolução:</strong> <span className="font-semibold text-destructive">{format(parseISO(suit.returnDate!), "PPP", { locale: ptBR })}</span> ({getDaysRemainingText(suit.returnDate)})</p>
                     {suit.customerPhone && <p><strong>Telefone:</strong> {suit.customerPhone}</p>}
                     {suit.customerEmail && <p><strong>Email:</strong> {suit.customerEmail}</p>}
                   </CardContent>
@@ -146,18 +183,68 @@ export default function HomePage() {
           </div>
         )}
 
-        {suits.length === 0 ? (
-          <div className="text-center py-10">
-            <h2 className="text-2xl font-semibold text-muted-foreground">Seu catálogo está vazio.</h2>
-            <p className="text-muted-foreground mt-2">Clique em "Adicionar Terno" para começar a montar sua coleção.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {suits.map(suit => (
-              <SuitCard key={suit.id} suit={suit} onEdit={handleEditSuit} onDelete={handleDeleteSuit} />
-            ))}
-          </div>
-        )}
+        <Tabs defaultValue="all-suits" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 md:w-[calc(50%-2rem)] lg:w-[calc(33%-2rem)] mb-6 mx-auto">
+            <TabsTrigger value="all-suits">Todos os Ternos</TabsTrigger>
+            <TabsTrigger value="upcoming-returns">Devoluções Próximas</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="all-suits">
+            {suits.length === 0 ? (
+              <div className="text-center py-10">
+                <h2 className="text-2xl font-semibold text-muted-foreground">Seu catálogo está vazio.</h2>
+                <p className="text-muted-foreground mt-2">Clique em "Adicionar Terno" para começar a montar sua coleção.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {suits.map(suit => (
+                  <SuitCard key={suit.id} suit={suit} onEdit={handleEditSuit} onDelete={handleDeleteSuit} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="upcoming-returns">
+            {upcomingReturnSuitsForTab.length === 0 ? (
+              <div className="text-center py-10">
+                <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno com devolução próxima.</h2>
+                <p className="text-muted-foreground mt-2">Não há ternos programados para devolução nos próximos 7 dias.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {upcomingReturnSuitsForTab.map(suit => (
+                  <Card key={`upcoming-${suit.id}`} className="p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col sm:flex-row gap-4 items-start">
+                     {suit.photoUrl && (
+                        <div className="w-full sm:w-24 h-32 sm:h-auto sm:aspect-[3/4] relative bg-muted rounded overflow-hidden flex-shrink-0">
+                           <img src={suit.photoUrl} alt={suit.name} className="w-full h-full object-cover" data-ai-hint="suit fashion" />
+                        </div>
+                      )}
+                    <div className="flex-grow">
+                      <CardHeader className="p-0 mb-2">
+                         <ReminderCardTitle className="text-lg font-semibold">{suit.name} <span className="text-sm font-normal text-muted-foreground">(Cód: {suit.code})</span></ReminderCardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0 text-sm space-y-1">
+                        <p><strong>Cliente:</strong> {suit.customerName}</p>
+                        <p><strong>Data de Devolução:</strong> <span className="font-semibold text-destructive">{format(parseISO(suit.returnDate!), "PPP", { locale: ptBR })}</span> ({getDaysRemainingText(suit.returnDate)})</p>
+                        {suit.customerPhone && <p><strong>Telefone:</strong> {suit.customerPhone}</p>}
+                        {suit.customerEmail && <p><strong>Email:</strong> {suit.customerEmail}</p>}
+                        {suit.observations && <p className="mt-1 text-xs"><strong>Obs:</strong> {suit.observations}</p>}
+                      </CardContent>
+                    </div>
+                    <div className="mt-3 sm:mt-0 flex sm:flex-col gap-2 flex-shrink-0">
+                         <Button variant="outline" size="sm" onClick={() => handleEditSuit(suit)} className="w-full sm:w-auto">
+                            <Edit className="mr-1 h-4 w-4" /> Editar
+                         </Button>
+                         <Button variant="destructive" size="sm" onClick={() => handleDeleteSuit(suit.id)} className="w-full sm:w-auto">
+                             <Trash2 className="mr-1 h-4 w-4" /> Excluir
+                         </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </main>
 
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
@@ -203,4 +290,3 @@ export default function HomePage() {
     </div>
   );
 }
-

@@ -19,6 +19,19 @@ import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 
+const formatPhoneNumber = (value: string): string => {
+  if (!value) return value;
+  const phoneNumber = value.replace(/\D/g, ''); // Remove non-digits
+  const phoneNumberLength = phoneNumber.length;
+
+  if (phoneNumberLength === 0) return "";
+  if (phoneNumberLength <= 2) return `(${phoneNumber}`;
+  if (phoneNumberLength <= 7) return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2)}`;
+  if (phoneNumberLength <= 11) return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7, 11)}`;
+  return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7, 11)}`; // Cap at 11 digits
+};
+
+
 const suitFormSchema = z.object({
   name: z.string().min(3, { message: "O nome deve ter pelo menos 3 caracteres." }),
   code: z.string().min(1, { message: "O código é obrigatório." }),
@@ -26,13 +39,64 @@ const suitFormSchema = z.object({
   purchaseDate: z.date({ required_error: "A data da compra é obrigatória." }),
   suitPrice: z.coerce.number().min(0, { message: "O preço do terno deve ser positivo." }),
   rentalPrice: z.coerce.number().min(0, { message: "O preço do aluguel deve ser positivo." }),
+  
   deliveryDate: z.date().optional(),
   returnDate: z.date().optional(),
   observations: z.string().optional(),
-  customerName: z.string().min(1, { message: "O nome do cliente é obrigatório." }),
-  customerPhone: z.string().min(1, { message: "O telefone do cliente é obrigatório." }),
-  customerEmail: z.string().email({ message: "Endereço de e-mail inválido." }).min(1, {message: "O e-mail do cliente é obrigatório."}),
-});
+  
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
+  customerEmail: z.string().email({ message: "Formato de e-mail inválido." }).optional(),
+})
+.superRefine((data, ctx) => {
+  const hasCustomerName = data.customerName && data.customerName.trim() !== "";
+  const hasCustomerPhone = data.customerPhone && data.customerPhone.trim() !== "";
+  const hasCustomerEmail = data.customerEmail && data.customerEmail.trim() !== "";
+  
+  const isAttemptingRental = hasCustomerName || hasCustomerPhone || hasCustomerEmail;
+
+  if (isAttemptingRental) {
+    if (!data.customerName || data.customerName.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "O nome do cliente é obrigatório para registrar um aluguel.", path: ["customerName"] });
+    }
+    if (!data.customerPhone || data.customerPhone.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "O telefone do cliente é obrigatório para registrar um aluguel.", path: ["customerPhone"] });
+    } else if (!/^\(\d{2}\) \d{5}-\d{4}$/.test(data.customerPhone)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Formato de telefone inválido. Use (XX) XXXXX-XXXX.", path: ["customerPhone"] });
+    }
+    if (!data.customerEmail || data.customerEmail.trim() === "") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "O e-mail do cliente é obrigatório para registrar um aluguel.", path: ["customerEmail"] });
+    } else {
+        const emailCheck = z.string().email("Endereço de e-mail inválido.").safeParse(data.customerEmail);
+        if (!emailCheck.success) {
+             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Endereço de e-mail inválido.", path: ["customerEmail"] });
+        }
+    }
+    if (!data.deliveryDate) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "A data de entrega é obrigatória para aluguel.", path: ["deliveryDate"] });
+    }
+    if (!data.returnDate) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "A data de devolução é obrigatória para aluguel.", path: ["returnDate"] });
+    }
+  }
+
+  if (data.deliveryDate && data.returnDate && data.returnDate < data.deliveryDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "A data de devolução não pode ser anterior à data de entrega.",
+      path: ["returnDate"],
+    });
+  }
+})
+.transform(data => ({
+    ...data,
+    customerName: (data.customerName && data.customerName.trim() !== "") ? data.customerName.trim() : undefined,
+    customerPhone: (data.customerPhone && data.customerPhone.trim() !== "") ? data.customerPhone.trim() : undefined,
+    customerEmail: (data.customerEmail && data.customerEmail.trim() !== "") ? data.customerEmail.trim() : undefined,
+    observations: (data.observations && data.observations.trim() !== "") ? data.observations.trim() : undefined,
+    // deliveryDate and returnDate are Date objects or undefined, no transformation needed here for that.
+}));
+
 
 type SuitFormValues = z.infer<typeof suitFormSchema>;
 
@@ -57,6 +121,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
           customerName: initialData.customerName || "",
           customerPhone: initialData.customerPhone || "",
           customerEmail: initialData.customerEmail || "",
+          observations: initialData.observations || "",
         }
       : {
           name: "",
@@ -65,6 +130,8 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
           purchaseDate: new Date(),
           suitPrice: 0,
           rentalPrice: 0,
+          deliveryDate: undefined,
+          returnDate: undefined,
           observations: "",
           customerName: "",
           customerPhone: "",
@@ -78,28 +145,22 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
   });
 
   React.useEffect(() => {
-    // Reset form with potentially new initialData or cleared data.
-    // This includes resetting the file input if it's programmatically controlled or for UX.
     form.reset(memoizedDefaultValues);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // Clear file input
+      fileInputRef.current.value = ""; 
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData, form.reset]); // memoizedDefaultValues is not needed here as it's a dependency of the outer effect
-                                 // and form.reset is stable. Adding memoizedDefaultValues directly can cause loops.
-                                 // The issue was form.reset being part of the dep array, which is fine, but the
-                                 // memoizedDefaultValues recalculation on initialData change and then form.reset
-                                 // could be problematic if not handled carefully. Let's simplify the dep array.
-                                 // Corrected: useEffect depends on initialData changing, which rebuilds memoizedDefaultValues, then form.reset.
+  }, [initialData, form, memoizedDefaultValues]);
+
 
   const handleSubmit = (data: SuitFormValues) => {
     const submittedSuit: Suit = {
       ...data,
       id: initialData?.id || crypto.randomUUID(),
-      photoUrl: data.photoUrl || "", // Ensure photoUrl is string
+      photoUrl: data.photoUrl || "", 
       purchaseDate: format(data.purchaseDate, "yyyy-MM-dd"),
       deliveryDate: data.deliveryDate ? format(data.deliveryDate, "yyyy-MM-dd") : undefined,
       returnDate: data.returnDate ? format(data.returnDate, "yyyy-MM-dd") : undefined,
+      // customer fields are already string or undefined from transform
     };
     onSubmit(submittedSuit);
     if (fileInputRef.current) {
@@ -109,12 +170,6 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
   
   const handleCancel = () => {
     onCancel();
-    // No need to form.reset here if Dialog onOpenChange handles it,
-    // but if called directly, resetting is good.
-    // form.reset(memoizedDefaultValues); // Reset to initial state on cancel
-    // if (fileInputRef.current) {
-    //     fileInputRef.current.value = "";
-    // }
   };
 
 
@@ -162,8 +217,8 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                     if (file) {
                       if (file.size > 5 * 1024 * 1024) { // 5MB limit
                         toast({ variant: "destructive", title: "Arquivo Muito Grande", description: "Por favor, selecione uma imagem menor que 5MB." });
-                        if(fileInputRef.current) fileInputRef.current.value = ""; // Clear the file input
-                        field.onChange(form.getValues("photoUrl") || ""); // Revert to previous or empty
+                        if(fileInputRef.current) fileInputRef.current.value = ""; 
+                        field.onChange(form.getValues("photoUrl") || ""); 
                         return;
                       }
                       const reader = new FileReader();
@@ -171,21 +226,17 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                         field.onChange(reader.result as string);
                       };
                       reader.onerror = () => {
-                        // Preserve existing photoUrl on error, or clear if it was a new attempt
                         field.onChange(form.getValues("photoUrl") || "");
                         toast({ variant: "destructive", title: "Erro de Upload", description: "Não foi possível carregar a imagem." });
                       }
                       reader.readAsDataURL(file);
                     } else {
-                       // If no file is selected (e.g., user cancels file dialog), retain current value or empty.
-                       // This prevents clearing an existing image if the user clicks "browse" then "cancel".
                        field.onChange(form.getValues("photoUrl") || "");
                     }
                   }}
-                  // value={undefined} // We don't control 'value' for file inputs directly
                 />
               </FormControl>
-              {field.value && ( // field.value here is the data URI string
+              {field.value && ( 
                 <div className="mt-2">
                   <Image
                     src={field.value}
@@ -194,10 +245,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                     height={125}
                     className="rounded-md object-cover aspect-[3/4]"
                     data-ai-hint="suit preview"
-                    onError={(e) => {
-                        // This might indicate a problem with the data URI or network if it's a URL.
-                        // For robustness, we could clear field.value or show a placeholder.
-                        // (e.target as HTMLImageElement).style.display = 'none'; 
+                    onError={() => {
                         toast({variant: "destructive", title: "Erro de Visualização", description: "Não foi possível exibir a imagem de pré-visualização."})
                     }}
                   />
@@ -269,7 +317,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
           />
         </div>
 
-        <h3 className="text-lg font-medium border-t pt-4 mt-6">Informações do Aluguel (Opcional)</h3>
+        <h3 className="text-lg font-medium border-t pt-4 mt-6">Informações do Aluguel / Cliente</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             control={form.control}
@@ -342,18 +390,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
             )}
           />
         </div>
-        <FormField
-          control={form.control}
-          name="observations"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Observações</FormLabel>
-              <FormControl><Textarea placeholder="Ex: Pedidos especiais, notas sobre condição" {...field} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <h3 className="text-lg font-medium border-t pt-4 mt-6">Informações do Cliente</h3>
+        
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
            <FormField
             control={form.control}
@@ -372,7 +409,18 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Telefone do Cliente</FormLabel>
-                <FormControl><Input type="tel" placeholder="(XX) XXXXX-XXXX" {...field} /></FormControl>
+                <FormControl>
+                  <Input 
+                    type="tel" 
+                    placeholder="(XX) XXXXX-XXXX" 
+                    {...field}
+                    onChange={(e) => {
+                      const formatted = formatPhoneNumber(e.target.value);
+                      field.onChange(formatted);
+                    }}
+                    maxLength={15} 
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -389,6 +437,17 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
             )}
           />
         </div>
+        <FormField
+          control={form.control}
+          name="observations"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Observações</FormLabel>
+              <FormControl><Textarea placeholder="Ex: Pedidos especiais, notas sobre condição" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <div className="flex justify-end space-x-2 pt-6">
           <Button type="button" variant="outline" onClick={handleCancel}>Cancelar</Button>
           <Button type="submit">{initialData ? "Salvar Alterações" : "Adicionar Terno"}</Button>
@@ -397,4 +456,3 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
     </Form>
   );
 }
-
