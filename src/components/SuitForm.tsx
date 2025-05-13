@@ -46,14 +46,16 @@ const suitFormSchema = z.object({
   
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),
-  customerEmail: z.string().email({ message: "Formato de e-mail inválido." }).optional(),
+  customerEmail: z.string().email({ message: "Formato de e-mail inválido." }).optional().or(z.literal('')),
 })
 .superRefine((data, ctx) => {
   const hasCustomerName = data.customerName && data.customerName.trim() !== "";
   const hasCustomerPhone = data.customerPhone && data.customerPhone.trim() !== "";
   const hasCustomerEmail = data.customerEmail && data.customerEmail.trim() !== "";
   
-  const isAttemptingRental = hasCustomerName || hasCustomerPhone || hasCustomerEmail;
+  // If any rental-specific field (delivery/return date) is filled, or any customer field is filled,
+  // then all customer fields and rental dates become mandatory.
+  const isAttemptingRental = data.deliveryDate || data.returnDate || hasCustomerName || hasCustomerPhone || hasCustomerEmail;
 
   if (isAttemptingRental) {
     if (!data.customerName || data.customerName.trim() === "") {
@@ -94,7 +96,7 @@ const suitFormSchema = z.object({
     customerPhone: (data.customerPhone && data.customerPhone.trim() !== "") ? data.customerPhone.trim() : undefined,
     customerEmail: (data.customerEmail && data.customerEmail.trim() !== "") ? data.customerEmail.trim() : undefined,
     observations: (data.observations && data.observations.trim() !== "") ? data.observations.trim() : undefined,
-    // deliveryDate and returnDate are Date objects or undefined, no transformation needed here for that.
+    photoUrl: (data.photoUrl && data.photoUrl.trim() !== "") ? data.photoUrl.trim() : undefined,
 }));
 
 
@@ -111,32 +113,38 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const memoizedDefaultValues = React.useMemo(() => {
-    return initialData
-      ? {
-          ...initialData,
-          photoUrl: initialData.photoUrl || "",
-          purchaseDate: initialData.purchaseDate ? parseISO(initialData.purchaseDate) : new Date(),
-          deliveryDate: initialData.deliveryDate ? parseISO(initialData.deliveryDate) : undefined,
-          returnDate: initialData.returnDate ? parseISO(initialData.returnDate) : undefined,
-          customerName: initialData.customerName || "",
-          customerPhone: initialData.customerPhone || "",
-          customerEmail: initialData.customerEmail || "",
-          observations: initialData.observations || "",
-        }
-      : {
-          name: "",
-          code: "",
-          photoUrl: "",
-          purchaseDate: new Date(),
-          suitPrice: 0,
-          rentalPrice: 0,
-          deliveryDate: undefined,
-          returnDate: undefined,
-          observations: "",
-          customerName: "",
-          customerPhone: "",
-          customerEmail: "",
-        };
+    const baseValues = {
+      name: "",
+      code: "",
+      photoUrl: "",
+      purchaseDate: new Date(),
+      suitPrice: 0,
+      rentalPrice: 0,
+      deliveryDate: undefined as Date | undefined,
+      returnDate: undefined as Date | undefined,
+      observations: "",
+      customerName: "",
+      customerPhone: "",
+      customerEmail: "",
+    };
+
+    if (initialData) {
+      return {
+        ...baseValues,
+        ...initialData,
+        photoUrl: initialData.photoUrl || "",
+        purchaseDate: initialData.purchaseDate ? parseISO(initialData.purchaseDate) : new Date(),
+        suitPrice: initialData.suitPrice ?? 0,
+        rentalPrice: initialData.rentalPrice ?? 0,
+        deliveryDate: initialData.deliveryDate ? parseISO(initialData.deliveryDate) : undefined,
+        returnDate: initialData.returnDate ? parseISO(initialData.returnDate) : undefined,
+        customerName: initialData.customerName || "",
+        customerPhone: initialData.customerPhone || "",
+        customerEmail: initialData.customerEmail || "",
+        observations: initialData.observations || "",
+      };
+    }
+    return baseValues;
   }, [initialData]);
 
   const form = useForm<SuitFormValues>({
@@ -160,7 +168,6 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
       purchaseDate: format(data.purchaseDate, "yyyy-MM-dd"),
       deliveryDate: data.deliveryDate ? format(data.deliveryDate, "yyyy-MM-dd") : undefined,
       returnDate: data.returnDate ? format(data.returnDate, "yyyy-MM-dd") : undefined,
-      // customer fields are already string or undefined from transform
     };
     onSubmit(submittedSuit);
     if (fileInputRef.current) {
@@ -169,6 +176,10 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
   };
   
   const handleCancel = () => {
+    form.reset(memoizedDefaultValues); 
+     if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+    }
     onCancel();
   };
 
@@ -246,7 +257,8 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                     className="rounded-md object-cover aspect-[3/4]"
                     data-ai-hint="suit preview"
                     onError={() => {
-                        toast({variant: "destructive", title: "Erro de Visualização", description: "Não foi possível exibir a imagem de pré-visualização."})
+                        field.onChange(form.getValues("photoUrl") || "");
+                        toast({variant: "destructive", title: "Erro de Visualização", description: "Não foi possível exibir a imagem de pré-visualização. A imagem anterior foi mantida se existir."})
                     }}
                   />
                 </div>
@@ -317,7 +329,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
           />
         </div>
 
-        <h3 className="text-lg font-medium border-t pt-4 mt-6">Informações do Aluguel / Cliente</h3>
+        <h3 className="text-lg font-medium border-t pt-4 mt-6">Informações do Aluguel</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             control={form.control}
@@ -390,7 +402,19 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
             )}
           />
         </div>
-        
+         <FormField
+          control={form.control}
+          name="observations"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Observações do Aluguel</FormLabel>
+              <FormControl><Textarea placeholder="Ex: Pedidos especiais, notas sobre condição do terno para este aluguel" {...field} value={field.value ?? ""} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <h3 className="text-lg font-medium border-t pt-4 mt-6">Informações do Cliente</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
            <FormField
             control={form.control}
@@ -398,7 +422,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Nome do Cliente</FormLabel>
-                <FormControl><Input placeholder="João Silva" {...field} /></FormControl>
+                <FormControl><Input placeholder="João Silva" {...field} value={field.value ?? ""} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -414,6 +438,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                     type="tel" 
                     placeholder="(XX) XXXXX-XXXX" 
                     {...field}
+                    value={field.value ?? ""}
                     onChange={(e) => {
                       const formatted = formatPhoneNumber(e.target.value);
                       field.onChange(formatted);
@@ -431,28 +456,21 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Email do Cliente</FormLabel>
-                <FormControl><Input type="email" placeholder="nome@exemplo.com" {...field} /></FormControl>
+                <FormControl><Input type="email" placeholder="nome@exemplo.com" {...field} value={field.value ?? ""} /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-        <FormField
-          control={form.control}
-          name="observations"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Observações</FormLabel>
-              <FormControl><Textarea placeholder="Ex: Pedidos especiais, notas sobre condição" {...field} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+       
         <div className="flex justify-end space-x-2 pt-6">
           <Button type="button" variant="outline" onClick={handleCancel}>Cancelar</Button>
-          <Button type="submit">{initialData ? "Salvar Alterações" : "Adicionar Terno"}</Button>
+          <Button type="submit">{initialData?.id ? "Salvar Alterações" : "Adicionar Terno"}</Button>
         </div>
       </form>
     </Form>
   );
 }
+
+
+    
