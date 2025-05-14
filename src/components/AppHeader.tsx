@@ -1,6 +1,8 @@
+
 import { Button } from "@/components/ui/button";
 import { AppLogo } from "@/components/AppLogo";
-import { PlusCircle, Download } from "lucide-react";
+import { PlusCircle, Download, LogOut } from "lucide-react";
+import { logout } from "@/app/login/actions"; // Import the server action
 
 type AppHeaderProps = {
   onAddSuit: () => void;
@@ -17,13 +19,18 @@ export function AppHeader({ onAddSuit, onExportCSV }: AppHeaderProps) {
             SuitUp Aluguel
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={onAddSuit} variant="outline">
+        <div className="flex items-center gap-3"> {/* Increased gap slightly for new button */}
+          <Button onClick={onAddSuit} variant="outline" size="sm">
             <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Terno
           </Button>
-          <Button onClick={onExportCSV}>
-            <Download className="mr-2 h-4 w-4" /> Exportar Catálogo
+          <Button onClick={onExportCSV} size="sm">
+            <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
+          <form action={logout}>
+            <Button type="submit" variant="outline" size="sm">
+              <LogOut className="mr-2 h-4 w-4" /> Sair
+            </Button>
+          </form>
         </div>
       </div>
     </header>
