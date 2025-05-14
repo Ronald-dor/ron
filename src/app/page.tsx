@@ -21,6 +21,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { BellRing, Edit, Trash2, FileText, PackageCheck, PackageSearch, Archive, Handshake, CheckCircle2, Clock, Search as SearchIcon } from 'lucide-react';
 import { differenceInCalendarDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import Image from 'next/image'; // Added import for next/image
 
 const defaultCompanyInfo: CompanyInfo = {
   name: 'SuitUp Aluguel de Ternos',
