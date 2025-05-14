@@ -30,6 +30,7 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
+    // Initialize suits with unique IDs and ensure photoUrl is defined
     setSuits(mockSuits.map(suit => ({ 
       ...suit, 
       id: suit.id || crypto.randomUUID(), 
@@ -47,7 +48,7 @@ export default function HomePage() {
   const upcomingReturnSuitsForNotification = useMemo(() => {
     if (!isMounted) return [];
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
   
     return suits.filter(suit => {
       if (!suit.returnDate || !suit.customerName || suit.isReturned) return false; 
@@ -76,16 +77,28 @@ export default function HomePage() {
 
   const pendingSuits = useMemo(() => {
     if (!isMounted) return [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today for comparison
+
     return suits
-      .filter(suit => suit.customerName && !suit.isReturned)
+      .filter(suit => {
+        if (!suit.customerName || suit.isReturned || !suit.returnDate) return false;
+        try {
+          const returnDateObj = parseISO(suit.returnDate);
+          return differenceInCalendarDays(returnDateObj, today) < 0; // Only overdue suits
+        } catch (e) {
+          console.error("Erro ao analisar data de devolução para pendentes:", suit.returnDate, e);
+          return false;
+        }
+      })
       .sort((a, b) => (a.returnDate && b.returnDate ? parseISO(a.returnDate).getTime() - parseISO(b.returnDate).getTime() : 0));
   }, [suits, isMounted]);
 
   const returnedSuits = useMemo(() => {
     if (!isMounted) return [];
     return suits
-      .filter(suit => suit.customerName && suit.isReturned)
-      .sort((a,b) => (b.returnDate && a.returnDate ? parseISO(b.returnDate).getTime() - parseISO(a.returnDate).getTime() : 0)); 
+      .filter(suit => suit.customerName && suit.isReturned) // Only suits that were rented and are now marked as returned
+      .sort((a,b) => (b.returnDate && a.returnDate ? parseISO(b.returnDate).getTime() - parseISO(a.returnDate).getTime() : 0)); // Sort by most recent return
   }, [suits, isMounted]);
 
 
@@ -93,13 +106,18 @@ export default function HomePage() {
     if (!returnDateStr) return "";
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const returnDateObj = parseISO(returnDateStr);
-    const diff = differenceInCalendarDays(returnDateObj, today);
+    try {
+      const returnDateObj = parseISO(returnDateStr);
+      const diff = differenceInCalendarDays(returnDateObj, today);
 
-    if (diff < 0) return `Atrasado (${Math.abs(diff)} dia${Math.abs(diff) !== 1 ? 's' : ''})`;
-    if (diff === 0) return 'Hoje';
-    if (diff === 1) return 'Amanhã';
-    return `Em ${diff} dias`;
+      if (diff < 0) return `Atrasado (${Math.abs(diff)} dia${Math.abs(diff) !== 1 ? 's' : ''})`;
+      if (diff === 0) return 'Hoje';
+      if (diff === 1) return 'Amanhã';
+      return `Em ${diff} dias`;
+    } catch (e) {
+      console.error("Erro ao calcular dias restantes:", returnDateStr, e);
+      return "Data inválida";
+    }
   };
 
 
@@ -129,10 +147,10 @@ export default function HomePage() {
     const processedSuitData: Suit = { 
       ...suitData, 
       id: suitData.id || crypto.randomUUID(), 
-      photoUrl: suitData.photoUrl || "",
+      photoUrl: suitData.photoUrl || "", // Ensure photoUrl is always a string
       isReturned: suitData.isReturned || false,
     };
-     // If customer data is cleared, ensure isReturned is false
+     // If customer data is cleared (meaning it's available), ensure isReturned is false
     if (!processedSuitData.customerName) {
       processedSuitData.isReturned = false;
     }
@@ -159,7 +177,7 @@ export default function HomePage() {
   };
 
   const handleGenerateReceipt = (suit: Suit) => {
-    if (suit.customerName) { 
+    if (suit.customerName) { // Check if there's rental info
       generateReceiptPDF(suit);
       toast({ title: "Recibo Gerado", description: `O recibo para ${suit.name} foi gerado.` });
     } else {
@@ -208,7 +226,7 @@ export default function HomePage() {
             suit={suit} 
             onEdit={handleEditSuit} 
             onDelete={handleDeleteSuit} 
-            isForAvailableCatalog={true}
+            isForAvailableCatalog={true} // Pass true for the "Disponíveis" tab
           />
         ))}
       </div>
@@ -228,7 +246,7 @@ export default function HomePage() {
           </CardHeader>
           <CardContent className="p-0 text-sm space-y-1">
             <p><strong>Cliente:</strong> {suit.customerName}</p>
-            <p><strong>Data de Devolução:</strong> <span className={`font-semibold ${!suit.isReturned ? 'text-destructive' : 'text-green-600'}`}>{format(parseISO(suit.returnDate!), "PPP", { locale: ptBR })}</span> {!suit.isReturned && `(${getDaysRemainingText(suit.returnDate)})`}</p>
+            <p><strong>Data de Devolução:</strong> <span className={`font-semibold ${!suit.isReturned && suit.returnDate && differenceInCalendarDays(parseISO(suit.returnDate), new Date().setHours(0,0,0,0)) < 0 ? 'text-destructive' : (suit.isReturned ? 'text-green-600' : '')}`}>{suit.returnDate ? format(parseISO(suit.returnDate), "PPP", { locale: ptBR }) : "N/A"}</span> {!suit.isReturned && suit.returnDate && `(${getDaysRemainingText(suit.returnDate)})`}</p>
             <p><strong>Preço do Aluguel:</strong> R$ {suit.rentalPrice.toFixed(2).replace('.', ',')}</p>
             {suit.customerPhone && <p><strong>Telefone:</strong> {suit.customerPhone}</p>}
             {suit.customerEmail && <p><strong>Email:</strong> {suit.customerEmail}</p>}
@@ -279,7 +297,7 @@ export default function HomePage() {
                   <ReminderCardTitle className="text-md font-semibold mb-1">{suit.name} <span className="text-sm font-normal text-muted-foreground">(Cód: {suit.code})</span></ReminderCardTitle>
                   <CardContent className="p-0 text-sm space-y-0.5">
                     <p><strong>Cliente:</strong> {suit.customerName}</p>
-                    <p><strong>Data de Devolução:</strong> <span className="font-semibold text-destructive">{format(parseISO(suit.returnDate!), "PPP", { locale: ptBR })}</span> ({getDaysRemainingText(suit.returnDate)})</p>
+                    <p><strong>Data de Devolução:</strong> <span className="font-semibold text-destructive">{suit.returnDate ? format(parseISO(suit.returnDate), "PPP", { locale: ptBR }) : "N/A"}</span> {suit.returnDate && `(${getDaysRemainingText(suit.returnDate)})`}</p>
                     {suit.customerPhone && <p><strong>Telefone:</strong> {suit.customerPhone}</p>}
                     {suit.customerEmail && <p><strong>Email:</strong> {suit.customerEmail}</p>}
                   </CardContent>
@@ -293,7 +311,7 @@ export default function HomePage() {
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6 mx-auto md:max-w-xl lg:max-w-2xl">
             <TabsTrigger value="all-suits" className="flex items-center gap-2"><Archive className="h-4 w-4" />Disponíveis</TabsTrigger>
             <TabsTrigger value="alugados-suits" className="flex items-center gap-2"><Handshake className="h-4 w-4" />Alugados</TabsTrigger>
-            <TabsTrigger value="pending-suits" className="flex items-center gap-2"><PackageSearch className="h-4 w-4" />Pendentes</TabsTrigger>
+            <TabsTrigger value="pending-suits" className="flex items-center gap-2"><PackageSearch className="h-4 w-4" />Atrasados</TabsTrigger>
             <TabsTrigger value="returned-suits" className="flex items-center gap-2"><PackageCheck className="h-4 w-4" />Devolvidos</TabsTrigger>
           </TabsList>
 
@@ -317,8 +335,8 @@ export default function HomePage() {
           <TabsContent value="pending-suits">
             {pendingSuits.length === 0 ? (
               <div className="text-center py-10">
-                <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno pendente.</h2>
-                <p className="text-muted-foreground mt-2">Não há ternos atualmente alugados e aguardando devolução.</p>
+                <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno com devolução atrasada.</h2>
+                <p className="text-muted-foreground mt-2">Não há ternos aguardando devolução que já passaram do prazo.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -345,7 +363,7 @@ export default function HomePage() {
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
           setIsFormOpen(isOpen);
           if (!isOpen) {
-            setEditingSuit(null);
+            setEditingSuit(null); // Clear editing state when dialog closes
           }
         }}>
         <DialogContent className="sm:max-w-[425px] md:max-w-[700px] lg:max-w-[900px]">
@@ -355,7 +373,7 @@ export default function HomePage() {
               {editingSuit ? 'Atualize os detalhes deste terno.' : 'Insira os detalhes para o novo terno.'}
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh] pr-6">
+          <ScrollArea className="max-h-[70vh] pr-6"> {/* Added pr-6 for scrollbar spacing */}
             <SuitForm
               onSubmit={handleFormSubmit}
               initialData={editingSuit}
@@ -386,3 +404,5 @@ export default function HomePage() {
   );
 }
 
+
+    
