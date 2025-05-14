@@ -15,45 +15,72 @@ declare module 'jspdf' {
 
 export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
   const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const centerX = pageWidth / 2;
+  let currentY = 20; // Initial Y position
+  const smallLineSpacing = 1.8; // Spacing between detail lines
+  const sectionSpacing = 4; // Spacing after a block or before a line
 
-  // Company Info Header
+  // Company Name
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text(companyInfo.name, 105, 20, { align: 'center' });
-  
+  doc.text(companyInfo.name, centerX, currentY, { align: 'center' });
+  currentY += doc.getTextDimensions(companyInfo.name).h + sectionSpacing / 2;
+
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  let companyAddress = `${companyInfo.addressStreet}, ${companyInfo.addressNumber}`;
-  if (companyInfo.addressComplement) {
-    companyAddress += ` - ${companyInfo.addressComplement}`;
-  }
-  companyAddress += `\n${companyInfo.addressNeighborhood} - ${companyInfo.addressCity}/${companyInfo.addressState} - CEP: ${companyInfo.addressZip}`;
-  doc.text(companyAddress, 105, 28, { align: 'center' });
 
-  let companyContact = `Tel: ${companyInfo.phone} | Email: ${companyInfo.email}`;
-  if (companyInfo.cnpj) {
-    companyContact += `\nCNPJ: ${companyInfo.cnpj}`;
+  // Address Details
+  let addressLine1 = `${companyInfo.addressStreet}, ${companyInfo.addressNumber}`;
+  if (companyInfo.addressComplement && companyInfo.addressComplement.trim() !== '') {
+    addressLine1 += ` - ${companyInfo.addressComplement}`;
   }
-  doc.text(companyContact, 105, doc.getTextDimensions(companyAddress).h + 30, { align: 'center' });
+  doc.text(addressLine1, centerX, currentY, { align: 'center' });
+  currentY += doc.getTextDimensions(addressLine1).h + smallLineSpacing;
 
-  const lineYPosition = doc.getTextDimensions(companyAddress).h + doc.getTextDimensions(companyContact).h + 32;
+  doc.text(companyInfo.addressNeighborhood, centerX, currentY, { align: 'center' });
+  currentY += doc.getTextDimensions(companyInfo.addressNeighborhood).h + smallLineSpacing;
+
+  doc.text(`${companyInfo.addressCity} / ${companyInfo.addressState}`, centerX, currentY, { align: 'center' });
+  currentY += doc.getTextDimensions(`${companyInfo.addressCity} / ${companyInfo.addressState}`).h + smallLineSpacing;
+  
+  doc.text(`CEP: ${companyInfo.addressZip}`, centerX, currentY, { align: 'center' });
+  currentY += doc.getTextDimensions(`CEP: ${companyInfo.addressZip}`).h + sectionSpacing / 2;
+
+  // Contact Details
+  doc.text(`Telefone: ${companyInfo.phone}`, centerX, currentY, { align: 'center' });
+  currentY += doc.getTextDimensions(`Telefone: ${companyInfo.phone}`).h + smallLineSpacing;
+
+  doc.text(`Email: ${companyInfo.email}`, centerX, currentY, { align: 'center' });
+  currentY += doc.getTextDimensions(`Email: ${companyInfo.email}`).h + smallLineSpacing;
+
+  if (companyInfo.cnpj && companyInfo.cnpj.trim() !== '') {
+    doc.text(`CNPJ: ${companyInfo.cnpj}`, centerX, currentY, { align: 'center' });
+    currentY += doc.getTextDimensions(`CNPJ: ${companyInfo.cnpj}`).h + smallLineSpacing;
+  }
+  
+  currentY += sectionSpacing / 2; // Space before the horizontal line
+
+  // Horizontal Line
   doc.setLineWidth(0.5);
-  doc.line(15, lineYPosition, 195, lineYPosition);
-
+  doc.line(15, currentY, pageWidth - 15, currentY);
+  currentY += sectionSpacing + 2; // Space after line, before title
 
   // Receipt Title
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text("Comprovante de Aluguel", 105, lineYPosition + 10, { align: 'center' });
+  doc.text("Comprovante de Aluguel", centerX, currentY, { align: 'center' });
+  currentY += doc.getTextDimensions("Comprovante de Aluguel").h + 2;
   
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   const emissionDate = format(new Date(), "'Emitido em:' PPP, HH:mm:ss", { locale: ptBR });
-  doc.text(emissionDate, 105, lineYPosition + 16, { align: 'center' });
+  doc.text(emissionDate, centerX, currentY, { align: 'center' });
+  currentY += doc.getTextDimensions(emissionDate).h + sectionSpacing;
 
 
   doc.autoTable({
-    startY: lineYPosition + 24,
+    startY: currentY,
     head: [['Detalhe do Aluguel', 'Informação']],
     body: [
       ['Terno', `${suit.name} (Cód: ${suit.code})`],
@@ -80,7 +107,7 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
       0: { fontStyle: 'bold', cellWidth: 60 },
       1: { cellWidth: 'auto' },
     },
-    margin: { top: 15, right: 15, bottom: 25, left: 15 }, // Increased bottom margin for footer
+    margin: { top: 15, right: 15, bottom: 25, left: 15 },
     didDrawPage: (data) => {
         // Footer
         const pageCount = doc.getNumberOfPages();
