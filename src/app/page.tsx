@@ -2,11 +2,12 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Suit } from '@/types';
+import type { Suit, CompanyInfo } from '@/types';
 import { mockSuits } from '@/data/mockData';
 import { AppHeader } from '@/components/AppHeader';
 import { SuitCard } from '@/components/SuitCard';
 import { SuitForm } from '@/components/SuitForm';
+import { CompanyInfoSheet } from '@/components/CompanyInfoSheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle as ReminderCardTitle } from '@/components/ui/card';
@@ -21,6 +22,20 @@ import { BellRing, Edit, Trash2, FileText, PackageCheck, PackageSearch, Archive,
 import { differenceInCalendarDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+const defaultCompanyInfo: CompanyInfo = {
+  name: 'SuitUp Aluguel de Ternos',
+  addressStreet: 'Rua Principal',
+  addressNumber: '123',
+  addressComplement: 'Sala 10',
+  addressNeighborhood: 'Centro',
+  addressCity: 'Sua Cidade',
+  addressState: 'UF',
+  addressZip: '00000-000',
+  phone: '(XX) XXXXX-XXXX',
+  email: 'contato@suitup.com',
+  cnpj: 'XX.XXX.XXX/0001-XX',
+};
+
 export default function HomePage() {
   const [suits, setSuits] = useState<Suit[]>([]);
   const [isMounted, setIsMounted] = useState(false);
@@ -28,11 +43,12 @@ export default function HomePage() {
   const [editingSuit, setEditingSuit] = useState<Suit | null>(null);
   const [suitToDelete, setSuitToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [isCompanySheetOpen, setIsCompanySheetOpen] = useState(false);
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     setIsMounted(true);
-    // Initialize suits with unique IDs and ensure photoUrl is defined
     setSuits(mockSuits.map(suit => ({ 
       ...suit, 
       id: suit.id || crypto.randomUUID(), 
@@ -45,19 +61,33 @@ export default function HomePage() {
       observations: suit.observations || undefined,
       isReturned: suit.isReturned || false, 
     })));
+
+    // Load company info from localStorage
+    const storedCompanyInfo = localStorage.getItem('companyInfo');
+    if (storedCompanyInfo) {
+      setCompanyInfo(JSON.parse(storedCompanyInfo));
+    } else {
+      setCompanyInfo(defaultCompanyInfo); // Initialize with defaults if not found
+    }
   }, []);
+
+  const handleSaveCompanyInfo = (data: CompanyInfo) => {
+    setCompanyInfo(data);
+    localStorage.setItem('companyInfo', JSON.stringify(data));
+    toast({ title: "Informações da Empresa Salvas", description: "Os dados da sua empresa foram atualizados." });
+  };
 
   const upcomingReturnSuitsForNotification = useMemo(() => {
     if (!isMounted) return [];
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
+    today.setHours(0, 0, 0, 0); 
   
     return suits.filter(suit => {
       if (!suit.returnDate || !suit.customerName || suit.isReturned) return false; 
       try {
         const returnDateObj = parseISO(suit.returnDate);
         const diffInDays = differenceInCalendarDays(returnDateObj, today);
-        return diffInDays === 0 || diffInDays === 1; // Today or Tomorrow
+        return diffInDays === 0 || diffInDays === 1; 
       } catch (e) {
         console.error("Erro ao analisar data de devolução para lembrete:", suit.returnDate, e);
         return false;
@@ -88,7 +118,7 @@ export default function HomePage() {
     return filterByName(filtered);
   }, [suits, isMounted, searchTerm]);
 
-  const pendingSuits = useMemo(() => { // Renamed to Atrasados in UI, logic is for overdue
+  const pendingSuits = useMemo(() => { 
     if (!isMounted) return [];
     const today = new Date();
     today.setHours(0, 0, 0, 0); 
@@ -169,7 +199,6 @@ export default function HomePage() {
       processedSuitData.isReturned = false;
     }
 
-
     if (editingSuit) {
       setSuits(prevSuits => prevSuits.map(s => (s.id === processedSuitData.id ? processedSuitData : s)));
       toast({ title: "Terno Atualizado", description: `${processedSuitData.name} foi atualizado.` });
@@ -191,8 +220,12 @@ export default function HomePage() {
   };
 
   const handleGenerateReceipt = (suit: Suit) => {
+    if (!companyInfo) {
+       toast({ title: "Erro ao Gerar Recibo", description: `Informações da empresa não configuradas.`, variant: "destructive" });
+       return;
+    }
     if (suit.customerName) { 
-      generateReceiptPDF(suit);
+      generateReceiptPDF(suit, companyInfo);
       toast({ title: "Recibo Gerado", description: `O recibo para ${suit.name} foi gerado.` });
     } else {
       toast({ title: "Erro ao Gerar Recibo", description: `Não há informações de aluguel para ${suit.name}.`, variant: "destructive" });
@@ -215,7 +248,7 @@ export default function HomePage() {
   if (!isMounted) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
-        <AppHeader onAddSuit={() => {}} onExportCSV={() => {}} />
+        <AppHeader onAddSuit={() => {}} onExportCSV={() => {}} onOpenCompanySettings={() => {}} />
         <main className="flex-grow container mx-auto px-4 py-8">
           <p>Carregando catálogo...</p>
         </main>
@@ -299,7 +332,7 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <AppHeader onAddSuit={handleAddSuit} onExportCSV={handleExportCSV} />
+      <AppHeader onAddSuit={handleAddSuit} onExportCSV={handleExportCSV} onOpenCompanySettings={() => setIsCompanySheetOpen(true)} />
       <main className="flex-grow container mx-auto px-4 py-8">
         {isMounted && upcomingReturnSuitsForNotification.length > 0 && (
           <div className="mb-8 p-4 border rounded-lg shadow-md bg-card">
@@ -337,7 +370,7 @@ export default function HomePage() {
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6 mx-auto md:max-w-xl lg:max-w-2xl">
             <TabsTrigger value="all-suits" className="flex items-center gap-2"><Archive className="h-4 w-4" />Disponíveis</TabsTrigger>
             <TabsTrigger value="alugados-suits" className="flex items-center gap-2"><Handshake className="h-4 w-4" />Alugados</TabsTrigger>
-            <TabsTrigger value="pending-suits" className="flex items-center gap-2"><PackageSearch className="h-4 w-4" />Atrasados</TabsTrigger> {/* "Atrasados" to match content */}
+            <TabsTrigger value="pending-suits" className="flex items-center gap-2"><PackageSearch className="h-4 w-4" />Atrasados</TabsTrigger> 
             <TabsTrigger value="returned-suits" className="flex items-center gap-2"><PackageCheck className="h-4 w-4" />Devolvidos</TabsTrigger>
           </TabsList>
 
@@ -426,7 +459,13 @@ export default function HomePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CompanyInfoSheet 
+        isOpen={isCompanySheetOpen}
+        onClose={() => setIsCompanySheetOpen(false)}
+        onSave={handleSaveCompanyInfo}
+        initialData={companyInfo}
+      />
     </div>
   );
 }
-

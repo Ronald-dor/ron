@@ -18,3 +18,16 @@ export interface Suit {
   customerEmail?: string;
 }
 
+export interface CompanyInfo {
+  name: string;
+  addressStreet: string;
+  addressNumber: string;
+  addressComplement?: string;
+  addressNeighborhood: string;
+  addressCity: string;
+  addressState: string;
+  addressZip: string;
+  phone: string;
+  email: string;
+  cnpj?: string;
+}
