@@ -70,7 +70,7 @@ export default function HomePage() {
   const alugadosSuits = useMemo(() => {
     if (!isMounted) return [];
     return suits
-      .filter(suit => suit.customerName) 
+      .filter(suit => suit.customerName && !suit.isReturned) // Show only currently rented (not returned)
       .sort((a, b) => (b.deliveryDate && a.deliveryDate ? parseISO(b.deliveryDate).getTime() - parseISO(a.deliveryDate).getTime() : 0));
   }, [suits, isMounted]);
 
@@ -208,7 +208,7 @@ export default function HomePage() {
             suit={suit} 
             onEdit={handleEditSuit} 
             onDelete={handleDeleteSuit} 
-            isForAvailableCatalog={true} // Pass the new prop here
+            isForAvailableCatalog={true}
           />
         ))}
       </div>
@@ -304,8 +304,8 @@ export default function HomePage() {
           <TabsContent value="alugados-suits">
             {alugadosSuits.length === 0 ? (
               <div className="text-center py-10">
-                <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno com histórico de aluguel.</h2>
-                <p className="text-muted-foreground mt-2">Não há ternos que foram alugados anteriormente ou estão alugados no momento.</p>
+                <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno alugado no momento.</h2>
+                <p className="text-muted-foreground mt-2">Não há ternos atualmente em processo de aluguel.</p>
               </div>
             ) : (
               <div className="space-y-4">
