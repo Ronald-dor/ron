@@ -31,23 +31,24 @@ export function SuitCard({ suit, onEdit, onDelete, isForAvailableCatalog = false
             <Image
               src={suit.photoUrl} 
               alt={suit.name}
-              layout="fill"
-              objectFit="cover"
+              fill // Use fill for responsive images in a sized container
+              sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw" // Example sizes, adjust as needed
+              style={{ objectFit: "cover" }} // Replaces layout="fill" objectFit="cover"
               data-ai-hint="suit fashion photo"
+              priority={false} // Set to true for LCP images if applicable
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none'; 
+                // Optionally, find the sibling div and display it
+                const parent = (e.target as HTMLImageElement).parentElement;
+                const placeholder = parent?.querySelector('.image-off-placeholder');
+                if (placeholder) (placeholder as HTMLElement).style.display = 'flex';
               }}
             />
-          ) : (
-            <div className="flex items-center justify-center h-full">
+          ) : null}
+           {/* Placeholder always rendered, hidden by default if image loads */}
+           <div className={`image-off-placeholder flex items-center justify-center h-full ${suit.photoUrl ? 'hidden' : ''}`}>
               <ImageOff className="w-16 h-16 text-muted-foreground" />
             </div>
-          )}
-           {!suit.photoUrl && (
-             <div className="absolute inset-0 flex items-center justify-center h-full">
-              <ImageOff className="w-16 h-16 text-muted-foreground" />
-            </div>
-          )}
         </div>
       </CardHeader>
       <CardContent className="p-4 flex-grow">
@@ -57,12 +58,17 @@ export function SuitCard({ suit, onEdit, onDelete, isForAvailableCatalog = false
         <div className="text-lg font-semibold text-primary mb-2">
            R$ {suit.rentalPrice.toFixed(2).replace('.', ',')} / aluguel
         </div>
-        <div className="text-xs text-muted-foreground mb-1">
-          Preço do Terno: R$ {suit.suitPrice.toFixed(2).replace('.', ',')}
-        </div>
-        <div className="flex items-center text-xs text-muted-foreground mb-2">
-          <CalendarDays className="mr-1 h-3 w-3" /> Comprado em: {new Date(suit.purchaseDate).toLocaleDateString('pt-BR')}
-        </div>
+
+        {!isForAvailableCatalog && (
+          <>
+            <div className="text-xs text-muted-foreground mb-1">
+              Preço do Terno: R$ {suit.suitPrice.toFixed(2).replace('.', ',')}
+            </div>
+            <div className="flex items-center text-xs text-muted-foreground mb-2">
+              <CalendarDays className="mr-1 h-3 w-3" /> Comprado em: {new Date(suit.purchaseDate).toLocaleDateString('pt-BR')}
+            </div>
+          </>
+        )}
 
         {hasRentalHistory && !isForAvailableCatalog && suit.isReturned && (
           <Badge variant="outline" className="mt-2 mb-1 text-xs bg-green-100 text-green-700 border-green-300">
@@ -102,4 +108,3 @@ export function SuitCard({ suit, onEdit, onDelete, isForAvailableCatalog = false
     </Card>
   );
 }
-
