@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -13,23 +13,24 @@ import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Camera, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
+import { CameraCaptureDialog } from "./CameraCaptureDialog"; // Importe o novo componente
 
 const formatPhoneNumber = (value: string): string => {
   if (!value) return value;
-  const phoneNumber = value.replace(/\D/g, ''); // Remove non-digits
+  const phoneNumber = value.replace(/\D/g, ''); 
   const phoneNumberLength = phoneNumber.length;
 
   if (phoneNumberLength === 0) return "";
   if (phoneNumberLength <= 2) return `(${phoneNumber}`;
   if (phoneNumberLength <= 7) return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2)}`;
   if (phoneNumberLength <= 11) return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7, 11)}`;
-  return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7, 11)}`; // Cap at 11 digits
+  return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7, 11)}`;
 };
 
 
@@ -112,6 +113,7 @@ interface SuitFormProps {
 export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
 
   const memoizedDefaultValues = React.useMemo(() => {
     const baseValues = {
@@ -156,6 +158,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
   });
 
   const watchCustomerName = form.watch("customerName");
+  const watchPhotoUrl = form.watch("photoUrl");
 
   React.useEffect(() => {
     form.reset(memoizedDefaultValues);
@@ -189,11 +192,26 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
     onCancel();
   };
 
+  const handlePhotoCapture = (dataUri: string) => {
+    form.setValue('photoUrl', dataUri, { shouldValidate: true, shouldDirty: true });
+    setIsCameraDialogOpen(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // Clear file input if camera is used
+    }
+  };
+
+  const handleClearPhoto = () => {
+    form.setValue('photoUrl', '', { shouldValidate: true, shouldDirty: true });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const showIsReturnedCheckbox = 
-    watchCustomerName && 
+    (watchCustomerName && watchCustomerName.trim() !== "") &&
     (
       (!initialData?.customerName || watchCustomerName !== initialData.customerName) || 
-      (watchCustomerName === initialData?.customerName && !initialData?.isReturned)
+      (watchCustomerName === initialData?.customerName && initialData?.isReturned === false)
     );
 
 
@@ -231,49 +249,59 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Foto do Terno</FormLabel>
-              <FormControl>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                        toast({ variant: "destructive", title: "Arquivo Muito Grande", description: "Por favor, selecione uma imagem menor que 5MB." });
-                        if(fileInputRef.current) fileInputRef.current.value = ""; 
-                        field.onChange(form.getValues("photoUrl") || ""); 
-                        return;
+              <div className="flex flex-col sm:flex-row gap-2 items-start">
+                <FormControl className="flex-grow">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                          toast({ variant: "destructive", title: "Arquivo Muito Grande", description: "Por favor, selecione uma imagem menor que 5MB." });
+                          if(fileInputRef.current) fileInputRef.current.value = ""; 
+                          // field.onChange(form.getValues("photoUrl") || ""); // Don't revert if already has a value
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          field.onChange(reader.result as string);
+                        };
+                        reader.onerror = () => {
+                          // field.onChange(form.getValues("photoUrl") || "");
+                          toast({ variant: "destructive", title: "Erro de Upload", description: "Não foi possível carregar a imagem." });
+                        }
+                        reader.readAsDataURL(file);
+                      } else {
+                         // field.onChange(form.getValues("photoUrl") || ""); // Don't revert if already has a value
                       }
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        field.onChange(reader.result as string);
-                      };
-                      reader.onerror = () => {
-                        field.onChange(form.getValues("photoUrl") || "");
-                        toast({ variant: "destructive", title: "Erro de Upload", description: "Não foi possível carregar a imagem." });
-                      }
-                      reader.readAsDataURL(file);
-                    } else {
-                       field.onChange(form.getValues("photoUrl") || "");
-                    }
-                  }}
-                />
-              </FormControl>
-              {field.value && ( 
-                <div className="mt-2">
+                    }}
+                    className="w-full"
+                  />
+                </FormControl>
+                <Button type="button" variant="outline" onClick={() => setIsCameraDialogOpen(true)} className="w-full sm:w-auto">
+                  <Camera className="mr-2 h-4 w-4" /> Tirar Foto
+                </Button>
+              </div>
+              {watchPhotoUrl && ( 
+                <div className="mt-2 flex items-start gap-2">
                   <Image
-                    src={field.value}
+                    src={watchPhotoUrl}
                     alt="Pré-visualização do terno"
                     width={100}
                     height={125}
-                    className="rounded-md object-cover aspect-[3/4]"
+                    className="rounded-md object-cover aspect-[3/4] border"
                     data-ai-hint="suit preview"
                     onError={() => {
-                        field.onChange(form.getValues("photoUrl") || ""); // Keep previous value or set to empty
-                        toast({variant: "destructive", title: "Erro de Visualização", description: "Não foi possível exibir a imagem de pré-visualização. A imagem anterior foi mantida se existir."})
+                        // This might indicate an invalid data URI or broken link
+                        // Optionally clear it or show a placeholder
+                        toast({variant: "destructive", title: "Erro de Visualização", description: "Não foi possível exibir a imagem."})
                     }}
                   />
+                  <Button type="button" variant="ghost" size="sm" onClick={handleClearPhoto} aria-label="Limpar foto">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
               )}
               <FormMessage />
@@ -506,6 +534,11 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
           <Button type="submit">{initialData?.id ? "Salvar Alterações" : "Adicionar Terno"}</Button>
         </div>
       </form>
+      <CameraCaptureDialog
+        isOpen={isCameraDialogOpen}
+        onClose={() => setIsCameraDialogOpen(false)}
+        onCapture={handlePhotoCapture}
+      />
     </Form>
   );
 }
