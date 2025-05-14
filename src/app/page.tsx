@@ -132,6 +132,11 @@ export default function HomePage() {
       photoUrl: suitData.photoUrl || "",
       isReturned: suitData.isReturned || false,
     };
+     // If customer data is cleared, ensure isReturned is false
+    if (!processedSuitData.customerName) {
+      processedSuitData.isReturned = false;
+    }
+
 
     if (editingSuit) {
       setSuits(prevSuits => prevSuits.map(s => (s.id === processedSuitData.id ? processedSuitData : s)));
@@ -198,7 +203,13 @@ export default function HomePage() {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {suitList.map(suit => (
-          <SuitCard key={suit.id} suit={suit} onEdit={handleEditSuit} onDelete={handleDeleteSuit} />
+          <SuitCard 
+            key={suit.id} 
+            suit={suit} 
+            onEdit={handleEditSuit} 
+            onDelete={handleDeleteSuit} 
+            isForAvailableCatalog={true} // Pass the new prop here
+          />
         ))}
       </div>
     );
