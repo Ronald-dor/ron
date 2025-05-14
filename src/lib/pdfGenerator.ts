@@ -48,10 +48,13 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
 
 
   // Company Name
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text(companyInfo.name, centerX, currentY, { align: 'center' });
-  currentY += doc.getTextDimensions(companyInfo.name).h + sectionSpacing / 2;
+  if (companyInfo.receiptShowCompanyName !== false) {
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(companyInfo.name, centerX, currentY, { align: 'center' });
+    currentY += doc.getTextDimensions(companyInfo.name).h + sectionSpacing / 2;
+  }
+
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
@@ -176,7 +179,11 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
       doc.setFontSize(8);
       doc.setFont('helvetica', 'italic');
       const footerTextY = pageHeight - 15; 
-      doc.text(`${companyInfo.name} - Comprovante de Aluguel`, margin, footerTextY);
+      if (companyInfo.receiptShowCompanyName !== false) {
+        doc.text(`${companyInfo.name} - Comprovante de Aluguel`, margin, footerTextY);
+      } else {
+        doc.text(`Comprovante de Aluguel`, margin, footerTextY);
+      }
       
       const pageCount = doc.getNumberOfPages(); // For total pages
       doc.text(`Página ${data.pageNumber} de ${pageCount}`, pageWidth - margin, footerTextY, { align: 'right' });

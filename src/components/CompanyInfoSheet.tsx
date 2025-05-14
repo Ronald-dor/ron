@@ -38,6 +38,7 @@ const companyInfoSchema = z.object({
   receiptCustomText: z.string().optional(),
 
   // PDF Customization Options
+  receiptShowCompanyName: z.boolean().optional(),
   receiptShowCnpj: z.boolean().optional(),
   receiptShowCustomerEmail: z.boolean().optional(),
   receiptShowCustomerPhone: z.boolean().optional(),
@@ -99,6 +100,7 @@ const defaultCompanyInfoFormValues: CompanyInfoFormValues = {
     cnpj: '',
     receiptCustomTextTitle: '',
     receiptCustomText: '',
+    receiptShowCompanyName: true,
     receiptShowCnpj: true,
     receiptShowCustomerEmail: true,
     receiptShowCustomerPhone: true,
@@ -133,6 +135,7 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
         logoUrl: data.logoUrl || undefined,
         receiptCustomTextTitle: data.receiptCustomTextTitle?.trim() || undefined,
         receiptCustomText: data.receiptCustomText?.trim() || undefined,
+        receiptShowCompanyName: data.receiptShowCompanyName ?? true,
         receiptShowCnpj: data.receiptShowCnpj ?? true,
         receiptShowCustomerEmail: data.receiptShowCustomerEmail ?? true,
         receiptShowCustomerPhone: data.receiptShowCustomerPhone ?? true,
@@ -432,6 +435,18 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
                 />
                 <div className="space-y-3">
                     <FormLabel>Campos Visíveis no Recibo</FormLabel>
+                     <FormField
+                        control={form.control}
+                        name="receiptShowCompanyName"
+                        render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm">
+                            <FormControl>
+                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                            <FormLabel className="font-normal">Mostrar Nome da Empresa</FormLabel>
+                        </FormItem>
+                        )}
+                    />
                     <FormField
                         control={form.control}
                         name="receiptShowCnpj"

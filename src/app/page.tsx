@@ -38,6 +38,7 @@ const defaultCompanyInfo: CompanyInfo = {
   receiptCustomTextTitle: 'Observações Adicionais',
   receiptCustomText: 'Obrigado por escolher nossos serviços! Para dúvidas ou informações, entre em contato.',
   // PDF Customization Defaults
+  receiptShowCompanyName: true,
   receiptShowCnpj: true,
   receiptShowCustomerEmail: true,
   receiptShowCustomerPhone: true,
@@ -297,7 +298,7 @@ export default function HomePage() {
       <Card key={`rental-${suit.id}`} className="p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col sm:flex-row gap-4 items-start">
           {suit.photoUrl && (
             <div className="w-full sm:w-24 h-32 sm:h-auto sm:aspect-[3/4] relative bg-muted rounded overflow-hidden flex-shrink-0">
-                <img src={suit.photoUrl} alt={suit.name} className="w-full h-full object-cover" data-ai-hint="suit fashion" />
+                <Image src={suit.photoUrl} alt={suit.name} className="w-full h-full object-cover" data-ai-hint="suit fashion" fill />
             </div>
           )}
         <div className="flex-grow">

@@ -37,6 +37,7 @@ export interface CompanyInfo {
   receiptCustomText?: string; // Custom text for receipt (e.g., terms, notes)
 
   // PDF Customization Options
+  receiptShowCompanyName?: boolean; // Added
   receiptShowCnpj?: boolean;
   receiptShowCustomerEmail?: boolean;
   receiptShowCustomerPhone?: boolean;
