@@ -16,16 +16,16 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { exportSuitsToCSV } from '@/lib/export';
-import { generateReceiptPDF } from '@/lib/pdfGenerator'; 
+import { generateReceiptPDF } from '@/lib/pdfGenerator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BellRing, Edit, Trash2, FileText, PackageCheck, PackageSearch, Archive, Handshake, CheckCircle2, Clock, Search as SearchIcon } from 'lucide-react';
 import { differenceInCalendarDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import Image from 'next/image'; // Added import for next/image
+import Image from 'next/image';
 
 const defaultCompanyInfo: CompanyInfo = {
   name: 'SuitUp Aluguel de Ternos',
-  logoUrl: '', 
+  logoUrl: '',
   addressStreet: 'Rua Principal',
   addressNumber: '123',
   addressComplement: 'Sala 10',
@@ -38,14 +38,13 @@ const defaultCompanyInfo: CompanyInfo = {
   cnpj: 'XX.XXX.XXX/0001-XX',
   receiptCustomTextTitle: 'Observações Adicionais',
   receiptCustomText: 'Obrigado por escolher nossos serviços! Para dúvidas ou informações, entre em contato.',
-  // PDF Customization Defaults
   receiptShowCompanyName: true,
   receiptShowCnpj: true,
   receiptShowCustomerEmail: true,
   receiptShowCustomerPhone: true,
   receiptShowRentalObservations: true,
-  receiptLogoHeight: 20, // Default logo height in mm
-  receiptTableTheme: 'striped', // Default table theme
+  receiptLogoHeight: 20,
+  receiptTableTheme: 'striped',
 };
 
 export default function HomePage() {
@@ -61,10 +60,9 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // Initialize suits with random IDs and default empty strings for optional fields if missing
-    setSuits(mockSuits.map(suit => ({ 
-      ...suit, 
-      id: suit.id || crypto.randomUUID(), 
+    setSuits(mockSuits.map(suit => ({
+      ...suit,
+      id: suit.id || crypto.randomUUID(),
       photoUrl: suit.photoUrl || "",
       customerName: suit.customerName || undefined,
       customerPhone: suit.customerPhone || undefined,
@@ -72,16 +70,20 @@ export default function HomePage() {
       deliveryDate: suit.deliveryDate || undefined,
       returnDate: suit.returnDate || undefined,
       observations: suit.observations || undefined,
-      isReturned: suit.isReturned || false, 
+      isReturned: suit.isReturned || false,
     })));
 
     const storedCompanyInfo = localStorage.getItem('companyInfo');
     if (storedCompanyInfo) {
-      // Merge stored info with defaults to ensure new fields are present
-      const parsedInfo = JSON.parse(storedCompanyInfo);
-      setCompanyInfo(prev => ({ ...defaultCompanyInfo, ...prev, ...parsedInfo }));
+      try {
+        const parsedInfo = JSON.parse(storedCompanyInfo);
+        setCompanyInfo({ ...defaultCompanyInfo, ...parsedInfo });
+      } catch (error) {
+        console.error("Erro ao carregar informações da empresa do localStorage:", error);
+        setCompanyInfo(defaultCompanyInfo); // Fallback para os padrões se houver erro
+      }
     } else {
-      setCompanyInfo(defaultCompanyInfo); 
+      setCompanyInfo(defaultCompanyInfo);
     }
   }, []);
 
@@ -94,14 +96,14 @@ export default function HomePage() {
   const upcomingReturnSuitsForNotification = useMemo(() => {
     if (!isMounted) return [];
     const today = new Date();
-    today.setHours(0, 0, 0, 0); 
-  
+    today.setHours(0, 0, 0, 0);
+
     return suits.filter(suit => {
-      if (!suit.returnDate || !suit.customerName || suit.isReturned) return false; 
+      if (!suit.returnDate || !suit.customerName || suit.isReturned) return false;
       try {
         const returnDateObj = parseISO(suit.returnDate);
         const diffInDays = differenceInCalendarDays(returnDateObj, today);
-        return diffInDays === 0 || diffInDays === 1; 
+        return diffInDays === 0 || diffInDays === 1;
       } catch (e) {
         console.error("Erro ao analisar data de devolução para lembrete:", suit.returnDate, e);
         return false;
@@ -109,7 +111,7 @@ export default function HomePage() {
     });
   }, [suits, isMounted]);
 
-  const filterByName = (suitList: Suit[]) => {
+  const filterSuitsByName = (suitList: Suit[]) => {
     if (searchTerm.trim() === "") {
       return suitList;
     }
@@ -121,43 +123,43 @@ export default function HomePage() {
   const disponiveisSuits = useMemo(() => {
     if (!isMounted) return [];
     const filtered = suits.filter(suit => !suit.customerName || suit.isReturned);
-    return filterByName(filtered);
+    return filterSuitsByName(filtered);
   }, [suits, isMounted, searchTerm]);
 
   const alugadosSuits = useMemo(() => {
     if (!isMounted) return [];
     const filtered = suits
-      .filter(suit => suit.customerName && !suit.isReturned) 
+      .filter(suit => suit.customerName && !suit.isReturned)
       .sort((a, b) => (b.deliveryDate && a.deliveryDate ? parseISO(b.deliveryDate).getTime() - parseISO(a.deliveryDate).getTime() : 0));
-    return filterByName(filtered);
+    return filterSuitsByName(filtered);
   }, [suits, isMounted, searchTerm]);
 
-  const pendingSuits = useMemo(() => { 
+  const pendingSuits = useMemo(() => {
     if (!isMounted) return [];
     const today = new Date();
-    today.setHours(0, 0, 0, 0); 
+    today.setHours(0, 0, 0, 0);
 
     const filtered = suits
       .filter(suit => {
         if (!suit.customerName || suit.isReturned || !suit.returnDate) return false;
         try {
           const returnDateObj = parseISO(suit.returnDate);
-          return differenceInCalendarDays(returnDateObj, today) < 0; 
+          return differenceInCalendarDays(returnDateObj, today) < 0;
         } catch (e) {
           console.error("Erro ao analisar data de devolução para atrasados:", suit.returnDate, e);
           return false;
         }
       })
       .sort((a, b) => (a.returnDate && b.returnDate ? parseISO(a.returnDate).getTime() - parseISO(b.returnDate).getTime() : 0));
-    return filterByName(filtered);
+    return filterSuitsByName(filtered);
   }, [suits, isMounted, searchTerm]);
 
   const returnedSuits = useMemo(() => {
     if (!isMounted) return [];
     const filtered = suits
-      .filter(suit => suit.customerName && suit.isReturned) 
-      .sort((a,b) => (b.returnDate && a.returnDate ? parseISO(b.returnDate).getTime() - parseISO(a.returnDate).getTime() : 0)); 
-    return filterByName(filtered);
+      .filter(suit => suit.customerName && suit.isReturned)
+      .sort((a,b) => (b.returnDate && a.returnDate ? parseISO(b.returnDate).getTime() - parseISO(a.returnDate).getTime() : 0));
+    return filterSuitsByName(filtered);
   }, [suits, isMounted, searchTerm]);
 
 
@@ -203,10 +205,10 @@ export default function HomePage() {
   };
 
   const handleFormSubmit = (suitData: Suit) => {
-    const processedSuitData: Suit = { 
-      ...suitData, 
-      id: suitData.id || crypto.randomUUID(), 
-      photoUrl: suitData.photoUrl || "", 
+    const processedSuitData: Suit = {
+      ...suitData,
+      id: suitData.id || crypto.randomUUID(),
+      photoUrl: suitData.photoUrl || "",
       isReturned: suitData.isReturned || false,
     };
     if (!processedSuitData.customerName) {
@@ -234,12 +236,12 @@ export default function HomePage() {
   };
 
   const handleGenerateReceipt = (suit: Suit) => {
-    if (!companyInfo) { 
+    if (!companyInfo) {
        toast({ title: "Erro ao Gerar Recibo", description: `Informações da empresa não configuradas.`, variant: "destructive" });
        return;
     }
-    if (suit.customerName) { 
-      generateReceiptPDF(suit, companyInfo); 
+    if (suit.customerName) {
+      generateReceiptPDF(suit, companyInfo);
       toast({ title: "Recibo Gerado", description: `O recibo para ${suit.name} foi gerado.` });
     } else {
       toast({ title: "Erro ao Gerar Recibo", description: `Não há informações de aluguel para ${suit.name}.`, variant: "destructive" });
@@ -269,7 +271,7 @@ export default function HomePage() {
       </div>
     );
   }
-  
+
   const renderSuitList = (suitList: Suit[], emptyMessage: string, emptySubMessage: string) => {
     if (suitList.length === 0) {
       return (
@@ -283,12 +285,12 @@ export default function HomePage() {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {suitList.map(suit => (
-          <SuitCard 
-            key={suit.id} 
-            suit={suit} 
-            onEdit={handleEditSuit} 
-            onDelete={handleDeleteSuit} 
-            isForAvailableCatalog={true} 
+          <SuitCard
+            key={suit.id}
+            suit={suit}
+            onEdit={handleEditSuit}
+            onDelete={handleDeleteSuit}
+            isForAvailableCatalog={true}
           />
         ))}
       </div>
@@ -384,7 +386,7 @@ export default function HomePage() {
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6 mx-auto md:max-w-xl lg:max-w-2xl">
             <TabsTrigger value="all-suits" className="flex items-center gap-2"><Archive className="h-4 w-4" />Disponíveis</TabsTrigger>
             <TabsTrigger value="alugados-suits" className="flex items-center gap-2"><Handshake className="h-4 w-4" />Alugados</TabsTrigger>
-            <TabsTrigger value="pending-suits" className="flex items-center gap-2"><PackageSearch className="h-4 w-4" />Atrasados</TabsTrigger> 
+            <TabsTrigger value="pending-suits" className="flex items-center gap-2"><PackageSearch className="h-4 w-4" />Atrasados</TabsTrigger>
             <TabsTrigger value="returned-suits" className="flex items-center gap-2"><PackageCheck className="h-4 w-4" />Devolvidos</TabsTrigger>
           </TabsList>
 
@@ -436,7 +438,7 @@ export default function HomePage() {
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
           setIsFormOpen(isOpen);
           if (!isOpen) {
-            setEditingSuit(null); 
+            setEditingSuit(null);
           }
         }}>
         <DialogContent className="sm:max-w-[425px] md:max-w-[700px] lg:max-w-[900px]">
@@ -446,7 +448,7 @@ export default function HomePage() {
               {editingSuit ? 'Atualize os detalhes deste terno.' : 'Insira os detalhes para o novo terno.'}
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh] pr-6"> 
+          <ScrollArea className="max-h-[70vh] pr-6">
             <SuitForm
               onSubmit={handleFormSubmit}
               initialData={editingSuit}
@@ -474,7 +476,7 @@ export default function HomePage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <CompanyInfoSheet 
+      <CompanyInfoSheet
         isOpen={isCompanySheetOpen}
         onClose={() => setIsCompanySheetOpen(false)}
         onSave={handleSaveCompanyInfo}
@@ -483,4 +485,3 @@ export default function HomePage() {
     </div>
   );
 }
-

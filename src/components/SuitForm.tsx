@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -19,11 +19,11 @@ import { format, parseISO } from "date-fns";
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
-import { CameraCaptureDialog } from "./CameraCaptureDialog"; // Importe o novo componente
+import { CameraCaptureDialog } from "./CameraCaptureDialog";
 
 const formatPhoneNumber = (value: string): string => {
   if (!value) return value;
-  const phoneNumber = value.replace(/\D/g, ''); 
+  const phoneNumber = value.replace(/\D/g, '');
   const phoneNumberLength = phoneNumber.length;
 
   if (phoneNumberLength === 0) return "";
@@ -42,11 +42,11 @@ const suitFormSchema = z.object({
   suitPrice: z.coerce.number().min(0, { message: "O preço do terno deve ser positivo." }),
   rentalPrice: z.coerce.number().min(0, { message: "O preço do aluguel deve ser positivo." }),
   isReturned: z.boolean().optional(),
-  
+
   deliveryDate: z.date().optional(),
   returnDate: z.date().optional(),
   observations: z.string().optional(),
-  
+
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),
   customerEmail: z.string().email({ message: "Formato de e-mail inválido." }).optional().or(z.literal('')),
@@ -55,7 +55,7 @@ const suitFormSchema = z.object({
   const hasCustomerName = data.customerName && data.customerName.trim() !== "";
   const hasCustomerPhone = data.customerPhone && data.customerPhone.trim() !== "";
   const hasCustomerEmail = data.customerEmail && data.customerEmail.trim() !== "";
-  
+
   const isAttemptingRental = data.deliveryDate || data.returnDate || hasCustomerName || hasCustomerPhone || hasCustomerEmail;
 
   if (isAttemptingRental) {
@@ -104,6 +104,26 @@ const suitFormSchema = z.object({
 
 type SuitFormValues = z.infer<typeof suitFormSchema>;
 
+// Helper function to derive default form values
+const getDefaultSuitFormValues = (suit?: Suit | null): SuitFormValues => {
+  const now = new Date(); // Use a consistent 'now' for defaults
+  return {
+    name: suit?.name || "",
+    code: suit?.code || "",
+    photoUrl: suit?.photoUrl || "",
+    purchaseDate: suit?.purchaseDate ? parseISO(suit.purchaseDate) : now,
+    suitPrice: suit?.suitPrice ?? 0,
+    rentalPrice: suit?.rentalPrice ?? 0,
+    isReturned: suit?.isReturned ?? false,
+    deliveryDate: suit?.deliveryDate ? parseISO(suit.deliveryDate) : undefined,
+    returnDate: suit?.returnDate ? parseISO(suit.returnDate) : undefined,
+    observations: suit?.observations || "",
+    customerName: suit?.customerName || "",
+    customerPhone: suit?.customerPhone || "",
+    customerEmail: suit?.customerEmail || "",
+  };
+};
+
 interface SuitFormProps {
   onSubmit: (data: Suit) => void;
   initialData?: Suit | null;
@@ -115,64 +135,27 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false);
 
-  const memoizedDefaultValues = React.useMemo(() => {
-    const baseValues = {
-      name: "",
-      code: "",
-      photoUrl: "",
-      purchaseDate: new Date(),
-      suitPrice: 0,
-      rentalPrice: 0,
-      isReturned: false,
-      deliveryDate: undefined as Date | undefined,
-      returnDate: undefined as Date | undefined,
-      observations: "",
-      customerName: "",
-      customerPhone: "",
-      customerEmail: "",
-    };
-
-    if (initialData) {
-      return {
-        ...baseValues,
-        ...initialData,
-        photoUrl: initialData.photoUrl || "",
-        purchaseDate: initialData.purchaseDate ? parseISO(initialData.purchaseDate) : new Date(),
-        suitPrice: initialData.suitPrice ?? 0,
-        rentalPrice: initialData.rentalPrice ?? 0,
-        isReturned: initialData.isReturned ?? false,
-        deliveryDate: initialData.deliveryDate ? parseISO(initialData.deliveryDate) : undefined,
-        returnDate: initialData.returnDate ? parseISO(initialData.returnDate) : undefined,
-        customerName: initialData.customerName || "",
-        customerPhone: initialData.customerPhone || "",
-        customerEmail: initialData.customerEmail || "",
-        observations: initialData.observations || "",
-      };
-    }
-    return baseValues;
-  }, [initialData]);
-
   const form = useForm<SuitFormValues>({
     resolver: zodResolver(suitFormSchema),
-    defaultValues: memoizedDefaultValues,
+    defaultValues: getDefaultSuitFormValues(initialData),
   });
 
   const watchCustomerName = form.watch("customerName");
   const watchPhotoUrl = form.watch("photoUrl");
 
   React.useEffect(() => {
-    form.reset(memoizedDefaultValues);
+    form.reset(getDefaultSuitFormValues(initialData));
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; 
+      fileInputRef.current.value = "";
     }
-  }, [initialData, form, memoizedDefaultValues]);
+  }, [initialData, form]);
 
 
   const handleSubmit = (data: SuitFormValues) => {
     const submittedSuit: Suit = {
       ...data,
       id: initialData?.id || crypto.randomUUID(),
-      photoUrl: data.photoUrl || "", 
+      photoUrl: data.photoUrl || "",
       purchaseDate: format(data.purchaseDate, "yyyy-MM-dd"),
       deliveryDate: data.deliveryDate ? format(data.deliveryDate, "yyyy-MM-dd") : undefined,
       returnDate: data.returnDate ? format(data.returnDate, "yyyy-MM-dd") : undefined,
@@ -183,9 +166,9 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
         fileInputRef.current.value = "";
     }
   };
-  
+
   const handleCancel = () => {
-    form.reset(memoizedDefaultValues); 
+    form.reset(getDefaultSuitFormValues(initialData)); // Reset with potentially new initialData
      if (fileInputRef.current) {
         fileInputRef.current.value = "";
     }
@@ -207,10 +190,10 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
     }
   };
 
-  const showIsReturnedCheckbox = 
+  const showIsReturnedCheckbox =
     (watchCustomerName && watchCustomerName.trim() !== "") &&
     (
-      (!initialData?.customerName || watchCustomerName !== initialData.customerName) || 
+      (!initialData?.customerName || watchCustomerName !== initialData.customerName) ||
       (watchCustomerName === initialData?.customerName && initialData?.isReturned === false)
     );
 
@@ -260,8 +243,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                       if (file) {
                         if (file.size > 5 * 1024 * 1024) { // 5MB limit
                           toast({ variant: "destructive", title: "Arquivo Muito Grande", description: "Por favor, selecione uma imagem menor que 5MB." });
-                          if(fileInputRef.current) fileInputRef.current.value = ""; 
-                          // field.onChange(form.getValues("photoUrl") || ""); // Don't revert if already has a value
+                          if(fileInputRef.current) fileInputRef.current.value = "";
                           return;
                         }
                         const reader = new FileReader();
@@ -269,12 +251,9 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                           field.onChange(reader.result as string);
                         };
                         reader.onerror = () => {
-                          // field.onChange(form.getValues("photoUrl") || "");
                           toast({ variant: "destructive", title: "Erro de Upload", description: "Não foi possível carregar a imagem." });
                         }
                         reader.readAsDataURL(file);
-                      } else {
-                         // field.onChange(form.getValues("photoUrl") || ""); // Don't revert if already has a value
                       }
                     }}
                     className="w-full"
@@ -284,7 +263,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                   <Camera className="mr-2 h-4 w-4" /> Tirar Foto
                 </Button>
               </div>
-              {watchPhotoUrl && ( 
+              {watchPhotoUrl && (
                 <div className="mt-2 flex items-start gap-2">
                   <Image
                     src={watchPhotoUrl}
@@ -294,8 +273,6 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                     className="rounded-md object-cover aspect-[3/4] border"
                     data-ai-hint="suit preview"
                     onError={() => {
-                        // This might indicate an invalid data URI or broken link
-                        // Optionally clear it or show a placeholder
                         toast({variant: "destructive", title: "Erro de Visualização", description: "Não foi possível exibir a imagem."})
                     }}
                   />
@@ -500,16 +477,16 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
               <FormItem>
                 <FormLabel>Telefone do Cliente</FormLabel>
                 <FormControl>
-                  <Input 
-                    type="tel" 
-                    placeholder="(XX) XXXXX-XXXX" 
+                  <Input
+                    type="tel"
+                    placeholder="(XX) XXXXX-XXXX"
                     {...field}
                     value={field.value ?? ""}
                     onChange={(e) => {
                       const formatted = formatPhoneNumber(e.target.value);
                       field.onChange(formatted);
                     }}
-                    maxLength={15} 
+                    maxLength={15}
                   />
                 </FormControl>
                 <FormMessage />
@@ -528,7 +505,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
             )}
           />
         </div>
-       
+
         <div className="flex justify-end space-x-2 pt-6">
           <Button type="button" variant="outline" onClick={handleCancel}>Cancelar</Button>
           <Button type="submit">{initialData?.id ? "Salvar Alterações" : "Adicionar Terno"}</Button>
