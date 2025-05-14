@@ -5,13 +5,15 @@ import React, { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { CompanyInfo } from '@/types';
+import type { CompanyInfo, ReceiptTableTheme } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label'; // Not strictly needed if using FormLabel everywhere
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from './ui/scroll-area';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +36,14 @@ const companyInfoSchema = z.object({
   }),
   receiptCustomTextTitle: z.string().optional(),
   receiptCustomText: z.string().optional(),
+
+  // PDF Customization Options
+  receiptShowCnpj: z.boolean().optional(),
+  receiptShowCustomerEmail: z.boolean().optional(),
+  receiptShowCustomerPhone: z.boolean().optional(),
+  receiptShowRentalObservations: z.boolean().optional(),
+  receiptLogoHeight: z.coerce.number().positive("Altura do logo deve ser positiva.").optional(),
+  receiptTableTheme: z.enum(['striped', 'grid', 'plain']).optional(),
 });
 
 type CompanyInfoFormValues = z.infer<typeof companyInfoSchema>;
@@ -74,6 +84,28 @@ const formatCnpj = (value: string): string => {
   return `${cnpj.slice(0,2)}.${cnpj.slice(2,5)}.${cnpj.slice(5,8)}/${cnpj.slice(8,12)}-${cnpj.slice(12,14)}`;
 };
 
+const defaultCompanyInfoFormValues: CompanyInfoFormValues = {
+    name: '',
+    logoUrl: '',
+    addressStreet: '',
+    addressNumber: '',
+    addressComplement: '',
+    addressNeighborhood: '',
+    addressCity: '',
+    addressState: '',
+    addressZip: '',
+    phone: '',
+    email: '',
+    cnpj: '',
+    receiptCustomTextTitle: '',
+    receiptCustomText: '',
+    receiptShowCnpj: true,
+    receiptShowCustomerEmail: true,
+    receiptShowCustomerPhone: true,
+    receiptShowRentalObservations: true,
+    receiptLogoHeight: 20,
+    receiptTableTheme: 'striped',
+};
 
 export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: CompanyInfoSheetProps) {
   const { toast } = useToast();
@@ -81,32 +113,17 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
 
   const form = useForm<CompanyInfoFormValues>({
     resolver: zodResolver(companyInfoSchema),
-    defaultValues: initialData || {
-      name: '',
-      logoUrl: '',
-      addressStreet: '',
-      addressNumber: '',
-      addressComplement: '',
-      addressNeighborhood: '',
-      addressCity: '',
-      addressState: '',
-      addressZip: '',
-      phone: '',
-      email: '',
-      cnpj: '',
-      receiptCustomTextTitle: '',
-      receiptCustomText: '',
-    },
+    defaultValues: initialData ? { ...defaultCompanyInfoFormValues, ...initialData } : defaultCompanyInfoFormValues,
   });
 
   const watchLogoUrl = form.watch("logoUrl");
 
   React.useEffect(() => {
-    if (initialData) {
-      form.reset(initialData);
-    }
-     if (logoFileInputRef.current) {
-      logoFileInputRef.current.value = "";
+    if (isOpen) {
+        form.reset(initialData ? { ...defaultCompanyInfoFormValues, ...initialData } : defaultCompanyInfoFormValues);
+        if (logoFileInputRef.current) {
+            logoFileInputRef.current.value = "";
+        }
     }
   }, [initialData, form, isOpen]);
 
@@ -116,6 +133,12 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
         logoUrl: data.logoUrl || undefined,
         receiptCustomTextTitle: data.receiptCustomTextTitle?.trim() || undefined,
         receiptCustomText: data.receiptCustomText?.trim() || undefined,
+        receiptShowCnpj: data.receiptShowCnpj ?? true,
+        receiptShowCustomerEmail: data.receiptShowCustomerEmail ?? true,
+        receiptShowCustomerPhone: data.receiptShowCustomerPhone ?? true,
+        receiptShowRentalObservations: data.receiptShowRentalObservations ?? true,
+        receiptLogoHeight: data.receiptLogoHeight ?? 20,
+        receiptTableTheme: data.receiptTableTheme ?? 'striped',
     }
     onSave(processedData);
     onClose();
@@ -361,6 +384,105 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
                 )}
               />
 
+              <h3 className="text-md font-medium border-t pt-4 mt-4">Opções de Layout do Recibo</h3>
+                <FormField
+                    control={form.control}
+                    name="receiptLogoHeight"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Altura do Logo no Recibo (mm)</FormLabel>
+                        <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString() || '20'}>
+                        <FormControl>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Selecione a altura do logo" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            <SelectItem value="15">Pequeno (15mm)</SelectItem>
+                            <SelectItem value="20">Médio (20mm)</SelectItem>
+                            <SelectItem value="25">Grande (25mm)</SelectItem>
+                            <SelectItem value="30">Extra Grande (30mm)</SelectItem>
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="receiptTableTheme"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Tema da Tabela de Detalhes</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || 'striped'}>
+                        <FormControl>
+                            <SelectTrigger>
+                            <SelectValue placeholder="Selecione um tema" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            <SelectItem value="striped">Listrado (Padrão)</SelectItem>
+                            <SelectItem value="grid">Grade Completa</SelectItem>
+                            <SelectItem value="plain">Simples (Sem linhas)</SelectItem>
+                        </SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <div className="space-y-3">
+                    <FormLabel>Campos Visíveis no Recibo</FormLabel>
+                    <FormField
+                        control={form.control}
+                        name="receiptShowCnpj"
+                        render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm">
+                            <FormControl>
+                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                            <FormLabel className="font-normal">Mostrar CNPJ da Empresa</FormLabel>
+                        </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="receiptShowCustomerPhone"
+                        render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm">
+                            <FormControl>
+                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                            <FormLabel className="font-normal">Mostrar Telefone do Cliente</FormLabel>
+                        </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="receiptShowCustomerEmail"
+                        render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm">
+                            <FormControl>
+                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                            <FormLabel className="font-normal">Mostrar Email do Cliente</FormLabel>
+                        </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="receiptShowRentalObservations"
+                        render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-3 shadow-sm">
+                            <FormControl>
+                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                            <FormLabel className="font-normal">Mostrar Observações do Aluguel</FormLabel>
+                        </FormItem>
+                        )}
+                    />
+                </div>
+
+
               <SheetFooter className="p-6 border-t mt-4 sticky bottom-0 bg-background">
                 <SheetClose asChild>
                   <Button type="button" variant="outline">Cancelar</Button>
@@ -374,3 +496,4 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
     </Sheet>
   );
 }
+

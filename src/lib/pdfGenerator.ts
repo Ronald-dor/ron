@@ -16,7 +16,6 @@ declare module 'jspdf' {
 export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
   const contentWidth = pageWidth - (2 * margin);
   const centerX = pageWidth / 2;
@@ -28,9 +27,9 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
   if (companyInfo.logoUrl) {
     try {
       const imgProps = doc.getImageProperties(companyInfo.logoUrl);
-      const desiredLogoHeight = 20; // mm
+      const desiredLogoHeight = companyInfo.receiptLogoHeight || 20; // Use configured height or default
       let logoDisplayWidth = (imgProps.width * desiredLogoHeight) / imgProps.height;
-      const maxLogoWidth = 40; // mm, to prevent oversized logos
+      const maxLogoWidth = contentWidth * 0.8; // Max 80% of content width
       if (logoDisplayWidth > maxLogoWidth) {
         logoDisplayWidth = maxLogoWidth;
       }
@@ -40,7 +39,8 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
       currentY += desiredLogoHeight + 5; 
     } catch (e) {
       console.error("Erro ao adicionar logo ao PDF:", e);
-      currentY += 5; 
+      // If logo fails, add some default spacing
+      currentY += (companyInfo.receiptLogoHeight || 20) / 2;
     }
   } else {
     currentY = 20; 
@@ -80,7 +80,7 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
   doc.text(`Email: ${companyInfo.email}`, centerX, currentY, { align: 'center' });
   currentY += doc.getTextDimensions(`Email: ${companyInfo.email}`).h + smallLineSpacing;
 
-  if (companyInfo.cnpj && companyInfo.cnpj.trim() !== '') {
+  if (companyInfo.cnpj && companyInfo.cnpj.trim() !== '' && companyInfo.receiptShowCnpj !== false) {
     doc.text(`CNPJ: ${companyInfo.cnpj}`, centerX, currentY, { align: 'center' });
     currentY += doc.getTextDimensions(`CNPJ: ${companyInfo.cnpj}`).h + smallLineSpacing;
   }
@@ -104,21 +104,35 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
   doc.text(emissionDate, centerX, currentY, { align: 'center' });
   currentY += doc.getTextDimensions(emissionDate).h + sectionSpacing;
 
+  // Table Data
+  const tableBody = [
+    ['Terno', `${suit.name} (Cód: ${suit.code})`],
+    ['Preço do Aluguel', `R$ ${suit.rentalPrice.toFixed(2).replace('.', ',')}`],
+    ['Cliente', suit.customerName || 'N/A'],
+  ];
+
+  if (companyInfo.receiptShowCustomerPhone !== false && suit.customerPhone) {
+    tableBody.push(['Telefone do Cliente', suit.customerPhone]);
+  }
+  if (companyInfo.receiptShowCustomerEmail !== false && suit.customerEmail) {
+    tableBody.push(['Email do Cliente', suit.customerEmail]);
+  }
+  
+  tableBody.push(['Data de Entrega', suit.deliveryDate ? format(parseISO(suit.deliveryDate), "PPP", { locale: ptBR }) : 'N/A']);
+  tableBody.push(['Data de Devolução', suit.returnDate ? format(parseISO(suit.returnDate), "PPP", { locale: ptBR }) : 'N/A']);
+  
+  if (companyInfo.receiptShowRentalObservations !== false && suit.observations) {
+    tableBody.push(['Observações do Aluguel', suit.observations]);
+  } else if (companyInfo.receiptShowRentalObservations !== false && !suit.observations) {
+    tableBody.push(['Observações do Aluguel', 'Nenhuma']);
+  }
+
 
   doc.autoTable({
     startY: currentY,
     head: [['Detalhe do Aluguel', 'Informação']],
-    body: [
-      ['Terno', `${suit.name} (Cód: ${suit.code})`],
-      ['Preço do Aluguel', `R$ ${suit.rentalPrice.toFixed(2).replace('.', ',')}`],
-      ['Cliente', suit.customerName || 'N/A'],
-      ['Telefone do Cliente', suit.customerPhone || 'N/A'],
-      ['Email do Cliente', suit.customerEmail || 'N/A'],
-      ['Data de Entrega', suit.deliveryDate ? format(parseISO(suit.deliveryDate), "PPP", { locale: ptBR }) : 'N/A'],
-      ['Data de Devolução', suit.returnDate ? format(parseISO(suit.returnDate), "PPP", { locale: ptBR }) : 'N/A'],
-      ['Observações do Aluguel', suit.observations || 'Nenhuma'],
-    ],
-    theme: 'striped', 
+    body: tableBody,
+    theme: companyInfo.receiptTableTheme || 'striped', 
     headStyles: { 
         fillColor: [30, 58, 138], 
         textColor: [255, 255, 255], 
@@ -133,16 +147,13 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
       0: { fontStyle: 'bold', cellWidth: 60 },
       1: { cellWidth: 'auto' },
     },
-    margin: { top: margin, right: margin, bottom: 25, left: margin }, // Adjusted bottom margin for footer + custom text
+    margin: { top: margin, right: margin, bottom: 25, left: margin }, 
     didDrawPage: (data) => {
-      // This is called after the table and before custom text, so we update currentY from here
-      // However, autoTable does not directly return its final Y. We use data.cursor.y for it.
-      // This will be overridden later if custom text is added.
-      let finalY = data.cursor?.y || currentY;
+      let finalY = data.cursor?.y || currentY; // Use cursor.y from autoTable hook
 
       // Custom Text Section
       if (companyInfo.receiptCustomText && companyInfo.receiptCustomText.trim() !== '') {
-        finalY += sectionSpacing; // Add some space before the custom text section
+        finalY += sectionSpacing; 
         
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
@@ -152,26 +163,26 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
 
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
+        // Ensure contentWidth is correctly defined here if not globally
         const customTextLines = doc.splitTextToSize(companyInfo.receiptCustomText, contentWidth);
         doc.text(customTextLines, margin, finalY);
-        finalY += (doc.getTextDimensions(customTextLines).h * customTextLines.length) + sectionSpacing;
+        // finalY += (doc.getTextDimensions(customTextLines).h * customTextLines.length) + sectionSpacing; // This was incorrect as getTextDimensions gives height of single line
+        finalY += (doc.getTextDimensions('M').h * customTextLines.length) + sectionSpacing; // Approximate height based on 'M' char
       }
 
 
       // Footer (Page Number and Company Name for Footer)
+      const pageHeight = doc.internal.pageSize.getHeight(); // Ensure pageHeight is accessible
       doc.setFontSize(8);
       doc.setFont('helvetica', 'italic');
-      const footerTextY = pageHeight - 15; // Position from bottom
+      const footerTextY = pageHeight - 15; 
       doc.text(`${companyInfo.name} - Comprovante de Aluguel`, margin, footerTextY);
       
-      const pageCount = doc.getNumberOfPages();
+      const pageCount = doc.getNumberOfPages(); // For total pages
       doc.text(`Página ${data.pageNumber} de ${pageCount}`, pageWidth - margin, footerTextY, { align: 'right' });
     }
   });
   
-  // Recalculate currentY after autoTable for potential custom text (if not handled by didDrawPage fully)
-  // This part is tricky because autoTable manages its own Y position.
-  // The didDrawPage hook is better for adding content after the table.
-
   doc.save(`recibo_aluguel_${suit.code}_${(suit.customerName || 'cliente').replace(/\s+/g, '_')}.pdf`);
 }
+

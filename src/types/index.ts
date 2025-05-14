@@ -18,6 +18,8 @@ export interface Suit {
   customerEmail?: string;
 }
 
+export type ReceiptTableTheme = 'striped' | 'grid' | 'plain';
+
 export interface CompanyInfo {
   name: string;
   addressStreet: string;
@@ -33,4 +35,13 @@ export interface CompanyInfo {
   logoUrl?: string; // Added for company logo
   receiptCustomTextTitle?: string; // Title for custom text section on receipt
   receiptCustomText?: string; // Custom text for receipt (e.g., terms, notes)
+
+  // PDF Customization Options
+  receiptShowCnpj?: boolean;
+  receiptShowCustomerEmail?: boolean;
+  receiptShowCustomerPhone?: boolean;
+  receiptShowRentalObservations?: boolean;
+  receiptLogoHeight?: number; // e.g., 15, 20, 25 (mm)
+  receiptTableTheme?: ReceiptTableTheme;
 }
+

@@ -37,6 +37,13 @@ const defaultCompanyInfo: CompanyInfo = {
   cnpj: 'XX.XXX.XXX/0001-XX',
   receiptCustomTextTitle: 'Observações Adicionais',
   receiptCustomText: 'Obrigado por escolher nossos serviços! Para dúvidas ou informações, entre em contato.',
+  // PDF Customization Defaults
+  receiptShowCnpj: true,
+  receiptShowCustomerEmail: true,
+  receiptShowCustomerPhone: true,
+  receiptShowRentalObservations: true,
+  receiptLogoHeight: 20, // Default logo height in mm
+  receiptTableTheme: 'striped', // Default table theme
 };
 
 export default function HomePage() {
@@ -52,6 +59,7 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
+    // Initialize suits with random IDs and default empty strings for optional fields if missing
     setSuits(mockSuits.map(suit => ({ 
       ...suit, 
       id: suit.id || crypto.randomUUID(), 
@@ -67,7 +75,9 @@ export default function HomePage() {
 
     const storedCompanyInfo = localStorage.getItem('companyInfo');
     if (storedCompanyInfo) {
-      setCompanyInfo(JSON.parse(storedCompanyInfo));
+      // Merge stored info with defaults to ensure new fields are present
+      const parsedInfo = JSON.parse(storedCompanyInfo);
+      setCompanyInfo(prev => ({ ...defaultCompanyInfo, ...prev, ...parsedInfo }));
     } else {
       setCompanyInfo(defaultCompanyInfo); 
     }
@@ -471,3 +481,4 @@ export default function HomePage() {
     </div>
   );
 }
+
