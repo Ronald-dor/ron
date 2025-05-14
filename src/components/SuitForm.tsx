@@ -97,7 +97,7 @@ const suitFormSchema = z.object({
     customerEmail: (data.customerEmail && data.customerEmail.trim() !== "") ? data.customerEmail.trim() : undefined,
     observations: (data.observations && data.observations.trim() !== "") ? data.observations.trim() : undefined,
     photoUrl: (data.photoUrl && data.photoUrl.trim() !== "") ? data.photoUrl.trim() : undefined,
-    isReturned: data.isReturned ?? false,
+    isReturned: (data.customerName && data.customerName.trim() !== "") ? (data.isReturned ?? false) : false,
 }));
 
 
@@ -189,6 +189,13 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
     onCancel();
   };
 
+  const showIsReturnedCheckbox = 
+    watchCustomerName && 
+    (
+      (!initialData?.customerName || watchCustomerName !== initialData.customerName) || 
+      (watchCustomerName === initialData?.customerName && !initialData?.isReturned)
+    );
+
 
   return (
     <Form {...form}>
@@ -263,7 +270,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                     className="rounded-md object-cover aspect-[3/4]"
                     data-ai-hint="suit preview"
                     onError={() => {
-                        field.onChange(form.getValues("photoUrl") || "");
+                        field.onChange(form.getValues("photoUrl") || ""); // Keep previous value or set to empty
                         toast({variant: "destructive", title: "Erro de Visualização", description: "Não foi possível exibir a imagem de pré-visualização. A imagem anterior foi mantida se existir."})
                     }}
                   />
@@ -419,7 +426,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
             </FormItem>
           )}
         />
-        { (watchCustomerName || initialData?.customerName) && (
+        { showIsReturnedCheckbox && (
             <FormField
                 control={form.control}
                 name="isReturned"
@@ -429,7 +436,6 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
                     <Checkbox
                         checked={field.value}
                         onCheckedChange={field.onChange}
-                        disabled={!watchCustomerName && !initialData?.customerName}
                     />
                     </FormControl>
                     <div className="space-y-1 leading-none">
@@ -503,6 +509,3 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
     </Form>
   );
 }
-
-
-    
