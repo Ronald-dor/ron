@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { exportSuitsToCSV } from '@/lib/export';
 import { generateReceiptPDF } from '@/lib/pdfGenerator'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BellRing, Edit, Trash2, FileText, PackageCheck, PackageSearch, Archive } from 'lucide-react';
+import { BellRing, Edit, Trash2, FileText, PackageCheck, PackageSearch, Archive, Handshake } from 'lucide-react';
 import { differenceInCalendarDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -60,6 +60,13 @@ export default function HomePage() {
         return false;
       }
     });
+  }, [suits, isMounted]);
+
+  const alugadosSuits = useMemo(() => {
+    if (!isMounted) return [];
+    return suits
+      .filter(suit => suit.customerName) // Suits with any rental history
+      .sort((a, b) => (b.deliveryDate && a.deliveryDate ? parseISO(b.deliveryDate).getTime() - parseISO(a.deliveryDate).getTime() : 0)); // Sort by delivery date descending
   }, [suits, isMounted]);
 
   const pendingSuits = useMemo(() => {
@@ -197,6 +204,11 @@ export default function HomePage() {
             <p><strong>Preço do Aluguel:</strong> R$ {suit.rentalPrice.toFixed(2).replace('.', ',')}</p>
             {suit.customerPhone && <p><strong>Telefone:</strong> {suit.customerPhone}</p>}
             {suit.customerEmail && <p><strong>Email:</strong> {suit.customerEmail}</p>}
+             {suit.isReturned ? (
+                <p className="text-xs font-semibold text-green-600">Status: Devolvido</p>
+            ) : (
+                <p className="text-xs font-semibold text-yellow-600">Status: Pendente</p>
+            )}
             {suit.observations && <p className="mt-1 text-xs"><strong>Obs:</strong> {suit.observations}</p>}
           </CardContent>
         </div>
@@ -241,14 +253,28 @@ export default function HomePage() {
         )}
 
         <Tabs defaultValue="all-suits" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 mb-6 mx-auto md:max-w-md lg:max-w-lg">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6 mx-auto md:max-w-xl lg:max-w-2xl">
             <TabsTrigger value="all-suits" className="flex items-center gap-2"><Archive className="h-4 w-4" />Todos</TabsTrigger>
+            <TabsTrigger value="alugados-suits" className="flex items-center gap-2"><Handshake className="h-4 w-4" />Alugados</TabsTrigger>
             <TabsTrigger value="pending-suits" className="flex items-center gap-2"><PackageSearch className="h-4 w-4" />Pendentes</TabsTrigger>
             <TabsTrigger value="returned-suits" className="flex items-center gap-2"><PackageCheck className="h-4 w-4" />Devolvidos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all-suits">
             {renderSuitList(suits, "Seu catálogo está vazio.", "Clique em \"Adicionar Terno\" para começar.")}
+          </TabsContent>
+
+          <TabsContent value="alugados-suits">
+            {alugadosSuits.length === 0 ? (
+              <div className="text-center py-10">
+                <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno com histórico de aluguel.</h2>
+                <p className="text-muted-foreground mt-2">Não há ternos que foram alugados anteriormente ou estão alugados no momento.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {alugadosSuits.map(suit => renderRentalSuitCard(suit))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="pending-suits">
