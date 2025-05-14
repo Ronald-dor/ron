@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { exportSuitsToCSV } from '@/lib/export';
 import { generateReceiptPDF } from '@/lib/pdfGenerator'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BellRing, Edit, Trash2, FileText, PackageCheck, PackageSearch, Archive, Handshake } from 'lucide-react';
+import { BellRing, Edit, Trash2, FileText, PackageCheck, PackageSearch, Archive, Handshake, CheckCircle2, Clock } from 'lucide-react';
 import { differenceInCalendarDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -40,7 +40,7 @@ export default function HomePage() {
       deliveryDate: suit.deliveryDate || undefined,
       returnDate: suit.returnDate || undefined,
       observations: suit.observations || undefined,
-      isReturned: suit.isReturned || false, // Ensure isReturned is boolean
+      isReturned: suit.isReturned || false, 
     })));
   }, []);
 
@@ -62,11 +62,16 @@ export default function HomePage() {
     });
   }, [suits, isMounted]);
 
+  const disponiveisSuits = useMemo(() => {
+    if (!isMounted) return [];
+    return suits.filter(suit => !suit.customerName || suit.isReturned);
+  }, [suits, isMounted]);
+
   const alugadosSuits = useMemo(() => {
     if (!isMounted) return [];
     return suits
-      .filter(suit => suit.customerName) // Suits with any rental history
-      .sort((a, b) => (b.deliveryDate && a.deliveryDate ? parseISO(b.deliveryDate).getTime() - parseISO(a.deliveryDate).getTime() : 0)); // Sort by delivery date descending
+      .filter(suit => suit.customerName) 
+      .sort((a, b) => (b.deliveryDate && a.deliveryDate ? parseISO(b.deliveryDate).getTime() - parseISO(a.deliveryDate).getTime() : 0));
   }, [suits, isMounted]);
 
   const pendingSuits = useMemo(() => {
@@ -80,7 +85,7 @@ export default function HomePage() {
     if (!isMounted) return [];
     return suits
       .filter(suit => suit.customerName && suit.isReturned)
-      .sort((a,b) => (b.returnDate && a.returnDate ? parseISO(b.returnDate).getTime() - parseISO(a.returnDate).getTime() : 0)); // Show most recently returned first
+      .sort((a,b) => (b.returnDate && a.returnDate ? parseISO(b.returnDate).getTime() - parseISO(a.returnDate).getTime() : 0)); 
   }, [suits, isMounted]);
 
 
@@ -149,12 +154,24 @@ export default function HomePage() {
   };
 
   const handleGenerateReceipt = (suit: Suit) => {
-    if (suit.customerName) { // Check if there's customer data for a receipt
+    if (suit.customerName) { 
       generateReceiptPDF(suit);
       toast({ title: "Recibo Gerado", description: `O recibo para ${suit.name} foi gerado.` });
     } else {
       toast({ title: "Erro ao Gerar Recibo", description: `Não há informações de aluguel para ${suit.name}.`, variant: "destructive" });
     }
+  };
+
+  const handleToggleReturnStatus = (suitToToggle: Suit) => {
+    setSuits(prevSuits =>
+      prevSuits.map(s =>
+        s.id === suitToToggle.id ? { ...s, isReturned: !s.isReturned } : s
+      )
+    );
+    toast({
+      title: "Status Atualizado",
+      description: `O terno ${suitToToggle.name} foi marcado como ${!suitToToggle.isReturned ? 'Devolvido' : 'Pendente'}.`,
+    });
   };
 
 
@@ -216,6 +233,15 @@ export default function HomePage() {
               <Button variant="outline" size="sm" onClick={() => handleEditSuit(suit)} className="w-full sm:w-auto">
                 <Edit className="mr-1 h-4 w-4" /> Editar
               </Button>
+              {!suit.isReturned ? (
+                <Button variant="outline" size="sm" onClick={() => handleToggleReturnStatus(suit)} className="w-full sm:w-auto">
+                    <CheckCircle2 className="mr-1 h-4 w-4" /> Marcar Devolvido
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => handleToggleReturnStatus(suit)} className="w-full sm:w-auto">
+                    <Clock className="mr-1 h-4 w-4" /> Marcar Pendente
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => handleGenerateReceipt(suit)} className="w-full sm:w-auto">
                 <FileText className="mr-1 h-4 w-4" /> Gerar Recibo
               </Button>
@@ -254,14 +280,14 @@ export default function HomePage() {
 
         <Tabs defaultValue="all-suits" className="w-full">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6 mx-auto md:max-w-xl lg:max-w-2xl">
-            <TabsTrigger value="all-suits" className="flex items-center gap-2"><Archive className="h-4 w-4" />Todos</TabsTrigger>
+            <TabsTrigger value="all-suits" className="flex items-center gap-2"><Archive className="h-4 w-4" />Disponíveis</TabsTrigger>
             <TabsTrigger value="alugados-suits" className="flex items-center gap-2"><Handshake className="h-4 w-4" />Alugados</TabsTrigger>
             <TabsTrigger value="pending-suits" className="flex items-center gap-2"><PackageSearch className="h-4 w-4" />Pendentes</TabsTrigger>
             <TabsTrigger value="returned-suits" className="flex items-center gap-2"><PackageCheck className="h-4 w-4" />Devolvidos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all-suits">
-            {renderSuitList(suits, "Seu catálogo está vazio.", "Clique em \"Adicionar Terno\" para começar.")}
+            {renderSuitList(disponiveisSuits, "Nenhum terno disponível no momento.", "Adicione novos ternos ou aguarde devoluções.")}
           </TabsContent>
 
           <TabsContent value="alugados-suits">
