@@ -26,7 +26,7 @@ This project now includes the following Firebase configuration files:
 
 *   **`.firebaserc`**: Associates your local project with your Firebase project.
     *   **Action Required:** You MUST replace `<YOUR_FIREBASE_PROJECT_ID>` in this file with your actual Firebase Project ID. You can find this ID in your Firebase project settings.
-*   **`firebase.json`**: Configures Firebase Hosting. It's set up to use Firebase's framework-aware deployment for Next.js.
+*   **`firebase.json`**: Configures Firebase Hosting. It's set up to use Firebase's framework-aware deployment for Next.js. It also includes settings for the backend resources.
 *   **`.gitignore`**: Updated to ignore Firebase-specific files and common Next.js build artifacts.
 
 ## Deployment Steps
@@ -59,9 +59,14 @@ This project now includes the following Firebase configuration files:
 
 ## Important Considerations
 
-*   **Region:** The backend resources (Cloud Run / Cloud Functions Gen 2) will be deployed to a default region (often `us-central1`). If you need a different region, you might need to adjust `firebase.json` or project settings before the first deploy with backend resources. For Next.js deployments, Firebase often handles this region selection.
+*   **Backend Configuration (`frameworksBackend`):**
+    *   The `firebase.json` file now includes a `frameworksBackend` section. This allows you to customize settings for the Cloud Run service that Firebase provisions for your Next.js app.
+    *   **`maxInstances`**: This is set to `10` by default in your `firebase.json`. If you encounter errors like "Max instances must be set to 10 or fewer to set the requested memory and CPU", this setting helps resolve it. You can adjust this value based on your needs and Firebase/Cloud Run limits.
+    *   Other options like `region`, `minInstances`, `concurrency`, `cpu`, and `memory` can also be set in the `frameworksBackend` object if needed. Refer to Firebase documentation for details.
+*   **Region:** The backend resources (Cloud Run / Cloud Functions Gen 2) will be deployed to a default region (often `us-central1`) unless specified in `frameworksBackend.region`.
 *   **Environment Variables:** If your application requires environment variables (e.g., API keys, database credentials NOT for client-side Firebase SDKs), you'll need to configure them for your Cloud Function/Cloud Run service. You can do this using `firebase functions:secrets:set MY_VARIABLE=secretvalue` (for Cloud Functions Gen 2) or by configuring them in the Cloud Run service settings via the Google Cloud Console. `.env.local` files are not deployed.
 *   **Cold Starts:** Server-side rendered applications on serverless platforms can sometimes experience "cold starts." Firebase's integration aims to minimize this, but it's something to be aware of for functions/services that haven't been invoked recently.
 *   **Genkit:** Your Genkit flows (if any were to be deployed to production) would typically be deployed as part of this Next.js app if they are invoked via Server Actions or API routes within Next.js. If you have separate Genkit flows intended to be standalone Firebase Functions, you would deploy them using `firebase deploy --only functions`.
 
 By following these steps, your Next.js application, including its server-side rendering, API routes, and server actions, should be successfully deployed and hosted on Firebase.
+
