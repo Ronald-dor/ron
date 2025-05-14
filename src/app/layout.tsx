@@ -12,7 +12,7 @@ const inter = Inter({
 const robotoMono = Roboto_Mono({
   subsets: ['latin'],
   variable: '--font-roboto-mono',
-  weight: ['400', '700'] // It's good practice to specify weights
+  weight: ['400', '700']
 });
 
 export const metadata: Metadata = {
