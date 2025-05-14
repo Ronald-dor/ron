@@ -2,7 +2,8 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react'; // Changed from react-dom
+import { useFormStatus } from 'react-dom';
 import { login } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +28,7 @@ function SubmitButton() {
 }
 
 export default function LoginPage() {
-  const [state, formAction] = useFormState(login, initialState);
+  const [state, formAction] = useActionState(login, initialState); // Changed from useFormState
   const { toast } = useToast();
 
   useEffect(() => {
