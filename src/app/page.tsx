@@ -88,7 +88,7 @@ export default function HomePage() {
     return filterByName(filtered);
   }, [suits, isMounted, searchTerm]);
 
-  const pendingSuits = useMemo(() => {
+  const pendingSuits = useMemo(() => { // Renamed to Atrasados in UI, logic is for overdue
     if (!isMounted) return [];
     const today = new Date();
     today.setHours(0, 0, 0, 0); 
@@ -214,7 +214,7 @@ export default function HomePage() {
 
   if (!isMounted) {
     return (
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen bg-background">
         <AppHeader onAddSuit={() => {}} onExportCSV={() => {}} />
         <main className="flex-grow container mx-auto px-4 py-8">
           <p>Carregando catálogo...</p>
@@ -337,7 +337,7 @@ export default function HomePage() {
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6 mx-auto md:max-w-xl lg:max-w-2xl">
             <TabsTrigger value="all-suits" className="flex items-center gap-2"><Archive className="h-4 w-4" />Disponíveis</TabsTrigger>
             <TabsTrigger value="alugados-suits" className="flex items-center gap-2"><Handshake className="h-4 w-4" />Alugados</TabsTrigger>
-            <TabsTrigger value="pending-suits" className="flex items-center gap-2"><PackageSearch className="h-4 w-4" />Atrasados</TabsTrigger>
+            <TabsTrigger value="pending-suits" className="flex items-center gap-2"><PackageSearch className="h-4 w-4" />Atrasados</TabsTrigger> {/* "Atrasados" to match content */}
             <TabsTrigger value="returned-suits" className="flex items-center gap-2"><PackageCheck className="h-4 w-4" />Devolvidos</TabsTrigger>
           </TabsList>
 
@@ -429,3 +429,4 @@ export default function HomePage() {
     </div>
   );
 }
+
