@@ -11,12 +11,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle as ReminderCardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { exportSuitsToCSV } from '@/lib/export';
 import { generateReceiptPDF } from '@/lib/pdfGenerator'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BellRing, Edit, Trash2, FileText, PackageCheck, PackageSearch, Archive, Handshake, CheckCircle2, Clock } from 'lucide-react';
+import { BellRing, Edit, Trash2, FileText, PackageCheck, PackageSearch, Archive, Handshake, CheckCircle2, Clock, Search as SearchIcon } from 'lucide-react';
 import { differenceInCalendarDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -26,6 +27,7 @@ export default function HomePage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSuit, setEditingSuit] = useState<Suit | null>(null);
   const [suitToDelete, setSuitToDelete] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -63,43 +65,56 @@ export default function HomePage() {
     });
   }, [suits, isMounted]);
 
+  const filterByName = (suitList: Suit[]) => {
+    if (searchTerm.trim() === "") {
+      return suitList;
+    }
+    return suitList.filter(suit =>
+      suit.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
   const disponiveisSuits = useMemo(() => {
     if (!isMounted) return [];
-    return suits.filter(suit => !suit.customerName || suit.isReturned);
-  }, [suits, isMounted]);
+    const filtered = suits.filter(suit => !suit.customerName || suit.isReturned);
+    return filterByName(filtered);
+  }, [suits, isMounted, searchTerm]);
 
   const alugadosSuits = useMemo(() => {
     if (!isMounted) return [];
-    return suits
-      .filter(suit => suit.customerName && !suit.isReturned) // Show only currently rented (not returned)
+    const filtered = suits
+      .filter(suit => suit.customerName && !suit.isReturned) 
       .sort((a, b) => (b.deliveryDate && a.deliveryDate ? parseISO(b.deliveryDate).getTime() - parseISO(a.deliveryDate).getTime() : 0));
-  }, [suits, isMounted]);
+    return filterByName(filtered);
+  }, [suits, isMounted, searchTerm]);
 
   const pendingSuits = useMemo(() => {
     if (!isMounted) return [];
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today for comparison
+    today.setHours(0, 0, 0, 0); 
 
-    return suits
+    const filtered = suits
       .filter(suit => {
         if (!suit.customerName || suit.isReturned || !suit.returnDate) return false;
         try {
           const returnDateObj = parseISO(suit.returnDate);
-          return differenceInCalendarDays(returnDateObj, today) < 0; // Only overdue suits
+          return differenceInCalendarDays(returnDateObj, today) < 0; 
         } catch (e) {
-          console.error("Erro ao analisar data de devolução para pendentes:", suit.returnDate, e);
+          console.error("Erro ao analisar data de devolução para atrasados:", suit.returnDate, e);
           return false;
         }
       })
       .sort((a, b) => (a.returnDate && b.returnDate ? parseISO(a.returnDate).getTime() - parseISO(b.returnDate).getTime() : 0));
-  }, [suits, isMounted]);
+    return filterByName(filtered);
+  }, [suits, isMounted, searchTerm]);
 
   const returnedSuits = useMemo(() => {
     if (!isMounted) return [];
-    return suits
-      .filter(suit => suit.customerName && suit.isReturned) // Only suits that were rented and are now marked as returned
-      .sort((a,b) => (b.returnDate && a.returnDate ? parseISO(b.returnDate).getTime() - parseISO(a.returnDate).getTime() : 0)); // Sort by most recent return
-  }, [suits, isMounted]);
+    const filtered = suits
+      .filter(suit => suit.customerName && suit.isReturned) 
+      .sort((a,b) => (b.returnDate && a.returnDate ? parseISO(b.returnDate).getTime() - parseISO(a.returnDate).getTime() : 0)); 
+    return filterByName(filtered);
+  }, [suits, isMounted, searchTerm]);
 
 
   const getDaysRemainingText = (returnDateStr: string | undefined): string => {
@@ -147,10 +162,9 @@ export default function HomePage() {
     const processedSuitData: Suit = { 
       ...suitData, 
       id: suitData.id || crypto.randomUUID(), 
-      photoUrl: suitData.photoUrl || "", // Ensure photoUrl is always a string
+      photoUrl: suitData.photoUrl || "", 
       isReturned: suitData.isReturned || false,
     };
-     // If customer data is cleared (meaning it's available), ensure isReturned is false
     if (!processedSuitData.customerName) {
       processedSuitData.isReturned = false;
     }
@@ -177,7 +191,7 @@ export default function HomePage() {
   };
 
   const handleGenerateReceipt = (suit: Suit) => {
-    if (suit.customerName) { // Check if there's rental info
+    if (suit.customerName) { 
       generateReceiptPDF(suit);
       toast({ title: "Recibo Gerado", description: `O recibo para ${suit.name} foi gerado.` });
     } else {
@@ -215,6 +229,7 @@ export default function HomePage() {
         <div className="text-center py-10">
           <h2 className="text-2xl font-semibold text-muted-foreground">{emptyMessage}</h2>
           <p className="text-muted-foreground mt-2">{emptySubMessage}</p>
+          {searchTerm && <p className="text-sm text-muted-foreground mt-1">(Termo pesquisado: "{searchTerm}")</p>}
         </div>
       );
     }
@@ -226,7 +241,7 @@ export default function HomePage() {
             suit={suit} 
             onEdit={handleEditSuit} 
             onDelete={handleDeleteSuit} 
-            isForAvailableCatalog={true} // Pass true for the "Disponíveis" tab
+            isForAvailableCatalog={true} 
           />
         ))}
       </div>
@@ -307,6 +322,17 @@ export default function HomePage() {
           </div>
         )}
 
+        <div className="mb-6 relative">
+          <Input
+            type="text"
+            placeholder="Pesquisar por nome do terno..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+        </div>
+
         <Tabs defaultValue="all-suits" className="w-full">
           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6 mx-auto md:max-w-xl lg:max-w-2xl">
             <TabsTrigger value="all-suits" className="flex items-center gap-2"><Archive className="h-4 w-4" />Disponíveis</TabsTrigger>
@@ -316,14 +342,14 @@ export default function HomePage() {
           </TabsList>
 
           <TabsContent value="all-suits">
-            {renderSuitList(disponiveisSuits, "Nenhum terno disponível no momento.", "Adicione novos ternos ou aguarde devoluções.")}
+            {renderSuitList(disponiveisSuits, "Nenhum terno disponível no momento.", searchTerm ? "Nenhum terno encontrado com este nome." : "Adicione novos ternos ou aguarde devoluções.")}
           </TabsContent>
 
           <TabsContent value="alugados-suits">
             {alugadosSuits.length === 0 ? (
               <div className="text-center py-10">
                 <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno alugado no momento.</h2>
-                <p className="text-muted-foreground mt-2">Não há ternos atualmente em processo de aluguel.</p>
+                <p className="text-muted-foreground mt-2">{searchTerm ? "Nenhum terno alugado encontrado com este nome." : "Não há ternos atualmente em processo de aluguel."}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -336,7 +362,7 @@ export default function HomePage() {
             {pendingSuits.length === 0 ? (
               <div className="text-center py-10">
                 <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno com devolução atrasada.</h2>
-                <p className="text-muted-foreground mt-2">Não há ternos aguardando devolução que já passaram do prazo.</p>
+                <p className="text-muted-foreground mt-2">{searchTerm ? "Nenhum terno atrasado encontrado com este nome." : "Não há ternos aguardando devolução que já passaram do prazo."}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -349,7 +375,7 @@ export default function HomePage() {
             {returnedSuits.length === 0 ? (
               <div className="text-center py-10">
                 <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno devolvido.</h2>
-                <p className="text-muted-foreground mt-2">Não há registros de ternos devolvidos.</p>
+                <p className="text-muted-foreground mt-2">{searchTerm ? "Nenhum terno devolvido encontrado com este nome." : "Não há registros de ternos devolvidos."}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -363,7 +389,7 @@ export default function HomePage() {
       <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
           setIsFormOpen(isOpen);
           if (!isOpen) {
-            setEditingSuit(null); // Clear editing state when dialog closes
+            setEditingSuit(null); 
           }
         }}>
         <DialogContent className="sm:max-w-[425px] md:max-w-[700px] lg:max-w-[900px]">
@@ -373,7 +399,7 @@ export default function HomePage() {
               {editingSuit ? 'Atualize os detalhes deste terno.' : 'Insira os detalhes para o novo terno.'}
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh] pr-6"> {/* Added pr-6 for scrollbar spacing */}
+          <ScrollArea className="max-h-[70vh] pr-6"> 
             <SuitForm
               onSubmit={handleFormSubmit}
               initialData={editingSuit}
@@ -403,6 +429,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-    
