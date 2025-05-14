@@ -30,4 +30,6 @@ export interface CompanyInfo {
   phone: string;
   email: string;
   cnpj?: string;
+  logoUrl?: string; // Added for company logo
 }
+

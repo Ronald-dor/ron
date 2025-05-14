@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -12,9 +12,13 @@ import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ScrollArea } from './ui/scroll-area';
+import Image from 'next/image';
+import { useToast } from '@/hooks/use-toast';
+import { Trash2, UploadCloud } from 'lucide-react';
 
 const companyInfoSchema = z.object({
   name: z.string().min(1, "Nome da empresa é obrigatório."),
+  logoUrl: z.string().optional(),
   addressStreet: z.string().min(1, "Rua é obrigatória."),
   addressNumber: z.string().min(1, "Número é obrigatório."),
   addressComplement: z.string().optional(),
@@ -69,10 +73,14 @@ const formatCnpj = (value: string): string => {
 
 
 export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: CompanyInfoSheetProps) {
+  const { toast } = useToast();
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+
   const form = useForm<CompanyInfoFormValues>({
     resolver: zodResolver(companyInfoSchema),
     defaultValues: initialData || {
       name: '',
+      logoUrl: '',
       addressStreet: '',
       addressNumber: '',
       addressComplement: '',
@@ -86,15 +94,31 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
     },
   });
 
+  const watchLogoUrl = form.watch("logoUrl");
+
   React.useEffect(() => {
     if (initialData) {
       form.reset(initialData);
     }
+     if (logoFileInputRef.current) {
+      logoFileInputRef.current.value = "";
+    }
   }, [initialData, form, isOpen]);
 
   const handleSubmit = (data: CompanyInfoFormValues) => {
-    onSave(data);
+    const processedData = {
+        ...data,
+        logoUrl: data.logoUrl || undefined,
+    }
+    onSave(processedData);
     onClose();
+  };
+
+  const handleClearLogo = () => {
+    form.setValue('logoUrl', '', { shouldValidate: true, shouldDirty: true });
+    if (logoFileInputRef.current) {
+      logoFileInputRef.current.value = "";
+    }
   };
 
   return (
@@ -116,6 +140,57 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
                   <FormItem>
                     <FormLabel>Nome da Empresa</FormLabel>
                     <FormControl><Input placeholder="SuitUp Aluguel de Ternos" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={form.control}
+                name="logoUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Logo da Empresa</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp"
+                        ref={logoFileInputRef}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 2 * 1024 * 1024) { // 2MB limit
+                              toast({ variant: "destructive", title: "Arquivo Muito Grande", description: "Por favor, selecione uma imagem menor que 2MB." });
+                              if(logoFileInputRef.current) logoFileInputRef.current.value = "";
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              field.onChange(reader.result as string);
+                            };
+                            reader.onerror = () => {
+                              toast({ variant: "destructive", title: "Erro de Upload", description: "Não foi possível carregar a imagem do logo." });
+                            }
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="w-full"
+                      />
+                    </FormControl>
+                    {watchLogoUrl && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Image
+                          src={watchLogoUrl}
+                          alt="Pré-visualização do logo"
+                          width={80}
+                          height={80}
+                          className="rounded-md object-contain border"
+                          data-ai-hint="company logo"
+                        />
+                        <Button type="button" variant="ghost" size="sm" onClick={handleClearLogo} aria-label="Limpar logo">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -254,7 +329,7 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
                   </FormItem>
                 )}
               />
-              <SheetFooter className="p-6 border-t mt-4">
+              <SheetFooter className="p-6 border-t mt-4 sticky bottom-0 bg-background">
                 <SheetClose asChild>
                   <Button type="button" variant="outline">Cancelar</Button>
                 </SheetClose>
@@ -267,3 +342,4 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
     </Sheet>
   );
 }
+

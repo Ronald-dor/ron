@@ -17,9 +17,33 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const centerX = pageWidth / 2;
-  let currentY = 20; // Initial Y position
-  const smallLineSpacing = 1.8; // Spacing between detail lines
-  const sectionSpacing = 4; // Spacing after a block or before a line
+  let currentY = 15; 
+  const smallLineSpacing = 1.8; 
+  const sectionSpacing = 4; 
+
+  // Add Company Logo if available
+  if (companyInfo.logoUrl) {
+    try {
+      const imgProps = doc.getImageProperties(companyInfo.logoUrl);
+      const desiredLogoHeight = 20; // mm
+      let logoDisplayWidth = (imgProps.width * desiredLogoHeight) / imgProps.height;
+      const maxLogoWidth = 40; // mm, to prevent oversized logos
+      if (logoDisplayWidth > maxLogoWidth) {
+        logoDisplayWidth = maxLogoWidth;
+      }
+      const logoX = centerX - (logoDisplayWidth / 2);
+      
+      doc.addImage(companyInfo.logoUrl, 'AUTO', logoX, currentY, logoDisplayWidth, desiredLogoHeight);
+      currentY += desiredLogoHeight + 5; // Add logo height and some padding
+    } catch (e) {
+      console.error("Erro ao adicionar logo ao PDF:", e);
+      // Fallback or continue without logo
+      currentY += 5; // Add some space even if logo fails, to avoid overlap
+    }
+  } else {
+    currentY = 20; // Default start Y if no logo
+  }
+
 
   // Company Name
   doc.setFontSize(18);
@@ -59,12 +83,12 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
     currentY += doc.getTextDimensions(`CNPJ: ${companyInfo.cnpj}`).h + smallLineSpacing;
   }
   
-  currentY += sectionSpacing / 2; // Space before the horizontal line
+  currentY += sectionSpacing / 2; 
 
   // Horizontal Line
   doc.setLineWidth(0.5);
   doc.line(15, currentY, pageWidth - 15, currentY);
-  currentY += sectionSpacing + 2; // Space after line, before title
+  currentY += sectionSpacing + 2; 
 
   // Receipt Title
   doc.setFontSize(16);

@@ -24,6 +24,7 @@ import { ptBR } from 'date-fns/locale';
 
 const defaultCompanyInfo: CompanyInfo = {
   name: 'SuitUp Aluguel de Ternos',
+  logoUrl: '', // Added default for logo
   addressStreet: 'Rua Principal',
   addressNumber: '123',
   addressComplement: 'Sala 10',
@@ -44,7 +45,7 @@ export default function HomePage() {
   const [suitToDelete, setSuitToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isCompanySheetOpen, setIsCompanySheetOpen] = useState(false);
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(defaultCompanyInfo); // Initialize with default
   const { toast } = useToast();
 
   useEffect(() => {
@@ -67,7 +68,8 @@ export default function HomePage() {
     if (storedCompanyInfo) {
       setCompanyInfo(JSON.parse(storedCompanyInfo));
     } else {
-      setCompanyInfo(defaultCompanyInfo); // Initialize with defaults if not found
+      // If nothing in localStorage, ensure defaultCompanyInfo (which now includes logoUrl) is set
+      setCompanyInfo(defaultCompanyInfo); 
     }
   }, []);
 
@@ -220,12 +222,12 @@ export default function HomePage() {
   };
 
   const handleGenerateReceipt = (suit: Suit) => {
-    if (!companyInfo) {
+    if (!companyInfo) { // companyInfo state is now initialized with default
        toast({ title: "Erro ao Gerar Recibo", description: `Informações da empresa não configuradas.`, variant: "destructive" });
        return;
     }
     if (suit.customerName) { 
-      generateReceiptPDF(suit, companyInfo);
+      generateReceiptPDF(suit, companyInfo); // Pass companyInfo
       toast({ title: "Recibo Gerado", description: `O recibo para ${suit.name} foi gerado.` });
     } else {
       toast({ title: "Erro ao Gerar Recibo", description: `Não há informações de aluguel para ${suit.name}.`, variant: "destructive" });
@@ -464,8 +466,9 @@ export default function HomePage() {
         isOpen={isCompanySheetOpen}
         onClose={() => setIsCompanySheetOpen(false)}
         onSave={handleSaveCompanyInfo}
-        initialData={companyInfo}
+        initialData={companyInfo} // Pass the state here
       />
     </div>
   );
 }
+
