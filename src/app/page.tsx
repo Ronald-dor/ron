@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -15,9 +14,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { exportSuitsToCSV } from '@/lib/export';
-import { generateReceiptPDF } from '@/lib/pdfGenerator'; // Import the PDF generator
+import { generateReceiptPDF } from '@/lib/pdfGenerator'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BellRing, Edit, Trash2, FileText } from 'lucide-react';
+import { BellRing, Edit, Trash2, FileText, PackageCheck, PackageSearch, Archive } from 'lucide-react';
 import { differenceInCalendarDays, parseISO, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -31,7 +30,6 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    // Ensure mockSuits are properly initialized with potentially undefined rental fields
     setSuits(mockSuits.map(suit => ({ 
       ...suit, 
       id: suit.id || crypto.randomUUID(), 
@@ -42,6 +40,7 @@ export default function HomePage() {
       deliveryDate: suit.deliveryDate || undefined,
       returnDate: suit.returnDate || undefined,
       observations: suit.observations || undefined,
+      isReturned: suit.isReturned || false, // Ensure isReturned is boolean
     })));
   }, []);
 
@@ -51,7 +50,7 @@ export default function HomePage() {
     today.setHours(0, 0, 0, 0);
   
     return suits.filter(suit => {
-      if (!suit.returnDate || !suit.customerName) return false; 
+      if (!suit.returnDate || !suit.customerName || suit.isReturned) return false; 
       try {
         const returnDateObj = parseISO(suit.returnDate);
         const diffInDays = differenceInCalendarDays(returnDateObj, today);
@@ -63,24 +62,18 @@ export default function HomePage() {
     });
   }, [suits, isMounted]);
 
-  const upcomingReturnSuitsForTab = useMemo(() => {
+  const pendingSuits = useMemo(() => {
     if (!isMounted) return [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
     return suits
-        .filter(suit => {
-            if (!suit.returnDate || !suit.customerName) return false;
-            try {
-                const returnDateObj = parseISO(suit.returnDate);
-                const diffInDays = differenceInCalendarDays(returnDateObj, today);
-                return diffInDays >= 0 && diffInDays <= 7; // Due in the next 7 days (inclusive of today)
-            } catch (e) {
-                console.error("Erro ao analisar data de devolução para aba:", suit.returnDate, e);
-                return false;
-            }
-        })
-        .sort((a, b) => parseISO(a.returnDate!).getTime() - parseISO(b.returnDate!).getTime());
+      .filter(suit => suit.customerName && !suit.isReturned)
+      .sort((a, b) => (a.returnDate && b.returnDate ? parseISO(a.returnDate).getTime() - parseISO(b.returnDate).getTime() : 0));
+  }, [suits, isMounted]);
+
+  const returnedSuits = useMemo(() => {
+    if (!isMounted) return [];
+    return suits
+      .filter(suit => suit.customerName && suit.isReturned)
+      .sort((a,b) => (b.returnDate && a.returnDate ? parseISO(b.returnDate).getTime() - parseISO(a.returnDate).getTime() : 0)); // Show most recently returned first
   }, [suits, isMounted]);
 
 
@@ -123,10 +116,9 @@ export default function HomePage() {
   const handleFormSubmit = (suitData: Suit) => {
     const processedSuitData: Suit = { 
       ...suitData, 
-      id: suitData.id || crypto.randomUUID(), // Ensure ID is present
+      id: suitData.id || crypto.randomUUID(), 
       photoUrl: suitData.photoUrl || "",
-      // The suitData from form already has fields as string or undefined based on Zod transform
-      // and date fields are formatted to string YYYY-MM-DD or undefined
+      isReturned: suitData.isReturned || false,
     };
 
     if (editingSuit) {
@@ -150,8 +142,12 @@ export default function HomePage() {
   };
 
   const handleGenerateReceipt = (suit: Suit) => {
-    generateReceiptPDF(suit);
-    toast({ title: "Recibo Gerado", description: `O recibo para ${suit.name} foi gerado.` });
+    if (suit.customerName) { // Check if there's customer data for a receipt
+      generateReceiptPDF(suit);
+      toast({ title: "Recibo Gerado", description: `O recibo para ${suit.name} foi gerado.` });
+    } else {
+      toast({ title: "Erro ao Gerar Recibo", description: `Não há informações de aluguel para ${suit.name}.`, variant: "destructive" });
+    }
   };
 
 
@@ -166,6 +162,59 @@ export default function HomePage() {
     );
   }
   
+  const renderSuitList = (suitList: Suit[], emptyMessage: string, emptySubMessage: string) => {
+    if (suitList.length === 0) {
+      return (
+        <div className="text-center py-10">
+          <h2 className="text-2xl font-semibold text-muted-foreground">{emptyMessage}</h2>
+          <p className="text-muted-foreground mt-2">{emptySubMessage}</p>
+        </div>
+      );
+    }
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {suitList.map(suit => (
+          <SuitCard key={suit.id} suit={suit} onEdit={handleEditSuit} onDelete={handleDeleteSuit} />
+        ))}
+      </div>
+    );
+  };
+
+  const renderRentalSuitCard = (suit: Suit) => (
+      <Card key={`rental-${suit.id}`} className="p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col sm:flex-row gap-4 items-start">
+          {suit.photoUrl && (
+            <div className="w-full sm:w-24 h-32 sm:h-auto sm:aspect-[3/4] relative bg-muted rounded overflow-hidden flex-shrink-0">
+                <img src={suit.photoUrl} alt={suit.name} className="w-full h-full object-cover" data-ai-hint="suit fashion" />
+            </div>
+          )}
+        <div className="flex-grow">
+          <CardHeader className="p-0 mb-2">
+              <ReminderCardTitle className="text-lg font-semibold">{suit.name} <span className="text-sm font-normal text-muted-foreground">(Cód: {suit.code})</span></ReminderCardTitle>
+          </CardHeader>
+          <CardContent className="p-0 text-sm space-y-1">
+            <p><strong>Cliente:</strong> {suit.customerName}</p>
+            <p><strong>Data de Devolução:</strong> <span className={`font-semibold ${!suit.isReturned ? 'text-destructive' : 'text-green-600'}`}>{format(parseISO(suit.returnDate!), "PPP", { locale: ptBR })}</span> {!suit.isReturned && `(${getDaysRemainingText(suit.returnDate)})`}</p>
+            <p><strong>Preço do Aluguel:</strong> R$ {suit.rentalPrice.toFixed(2).replace('.', ',')}</p>
+            {suit.customerPhone && <p><strong>Telefone:</strong> {suit.customerPhone}</p>}
+            {suit.customerEmail && <p><strong>Email:</strong> {suit.customerEmail}</p>}
+            {suit.observations && <p className="mt-1 text-xs"><strong>Obs:</strong> {suit.observations}</p>}
+          </CardContent>
+        </div>
+        <div className="mt-3 sm:mt-0 flex flex-col gap-2 flex-shrink-0 self-start sm:self-center">
+              <Button variant="outline" size="sm" onClick={() => handleEditSuit(suit)} className="w-full sm:w-auto">
+                <Edit className="mr-1 h-4 w-4" /> Editar
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleGenerateReceipt(suit)} className="w-full sm:w-auto">
+                <FileText className="mr-1 h-4 w-4" /> Gerar Recibo
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => handleDeleteSuit(suit.id)} className="w-full sm:w-auto">
+                  <Trash2 className="mr-1 h-4 w-4" /> Excluir
+              </Button>
+        </div>
+      </Card>
+  );
+
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader onAddSuit={handleAddSuit} onExportCSV={handleExportCSV} />
@@ -192,67 +241,38 @@ export default function HomePage() {
         )}
 
         <Tabs defaultValue="all-suits" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:w-[calc(50%-2rem)] lg:w-[calc(33%-2rem)] mb-6 mx-auto">
-            <TabsTrigger value="all-suits">Todos os Ternos</TabsTrigger>
-            <TabsTrigger value="upcoming-returns">Devoluções Próximas</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 mb-6 mx-auto md:max-w-md lg:max-w-lg">
+            <TabsTrigger value="all-suits" className="flex items-center gap-2"><Archive className="h-4 w-4" />Todos</TabsTrigger>
+            <TabsTrigger value="pending-suits" className="flex items-center gap-2"><PackageSearch className="h-4 w-4" />Pendentes</TabsTrigger>
+            <TabsTrigger value="returned-suits" className="flex items-center gap-2"><PackageCheck className="h-4 w-4" />Devolvidos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all-suits">
-            {suits.length === 0 ? (
+            {renderSuitList(suits, "Seu catálogo está vazio.", "Clique em \"Adicionar Terno\" para começar.")}
+          </TabsContent>
+
+          <TabsContent value="pending-suits">
+            {pendingSuits.length === 0 ? (
               <div className="text-center py-10">
-                <h2 className="text-2xl font-semibold text-muted-foreground">Seu catálogo está vazio.</h2>
-                <p className="text-muted-foreground mt-2">Clique em "Adicionar Terno" para começar a montar sua coleção.</p>
+                <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno pendente.</h2>
+                <p className="text-muted-foreground mt-2">Não há ternos atualmente alugados e aguardando devolução.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {suits.map(suit => (
-                  <SuitCard key={suit.id} suit={suit} onEdit={handleEditSuit} onDelete={handleDeleteSuit} />
-                ))}
+              <div className="space-y-4">
+                {pendingSuits.map(suit => renderRentalSuitCard(suit))}
               </div>
             )}
           </TabsContent>
 
-          <TabsContent value="upcoming-returns">
-            {upcomingReturnSuitsForTab.length === 0 ? (
+          <TabsContent value="returned-suits">
+            {returnedSuits.length === 0 ? (
               <div className="text-center py-10">
-                <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno com devolução próxima.</h2>
-                <p className="text-muted-foreground mt-2">Não há ternos programados para devolução nos próximos 7 dias.</p>
+                <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno devolvido.</h2>
+                <p className="text-muted-foreground mt-2">Não há registros de ternos devolvidos.</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {upcomingReturnSuitsForTab.map(suit => (
-                  <Card key={`upcoming-${suit.id}`} className="p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col sm:flex-row gap-4 items-start">
-                     {suit.photoUrl && (
-                        <div className="w-full sm:w-24 h-32 sm:h-auto sm:aspect-[3/4] relative bg-muted rounded overflow-hidden flex-shrink-0">
-                           <img src={suit.photoUrl} alt={suit.name} className="w-full h-full object-cover" data-ai-hint="suit fashion" />
-                        </div>
-                      )}
-                    <div className="flex-grow">
-                      <CardHeader className="p-0 mb-2">
-                         <ReminderCardTitle className="text-lg font-semibold">{suit.name} <span className="text-sm font-normal text-muted-foreground">(Cód: {suit.code})</span></ReminderCardTitle>
-                      </CardHeader>
-                      <CardContent className="p-0 text-sm space-y-1">
-                        <p><strong>Cliente:</strong> {suit.customerName}</p>
-                        <p><strong>Data de Devolução:</strong> <span className="font-semibold text-destructive">{format(parseISO(suit.returnDate!), "PPP", { locale: ptBR })}</span> ({getDaysRemainingText(suit.returnDate)})</p>
-                        <p><strong>Preço do Aluguel:</strong> R$ {suit.rentalPrice.toFixed(2).replace('.', ',')}</p>
-                        {suit.customerPhone && <p><strong>Telefone:</strong> {suit.customerPhone}</p>}
-                        {suit.customerEmail && <p><strong>Email:</strong> {suit.customerEmail}</p>}
-                        {suit.observations && <p className="mt-1 text-xs"><strong>Obs:</strong> {suit.observations}</p>}
-                      </CardContent>
-                    </div>
-                    <div className="mt-3 sm:mt-0 flex flex-col gap-2 flex-shrink-0 self-start sm:self-center">
-                         <Button variant="outline" size="sm" onClick={() => handleEditSuit(suit)} className="w-full sm:w-auto">
-                            <Edit className="mr-1 h-4 w-4" /> Editar
-                         </Button>
-                         <Button variant="outline" size="sm" onClick={() => handleGenerateReceipt(suit)} className="w-full sm:w-auto">
-                            <FileText className="mr-1 h-4 w-4" /> Gerar Recibo
-                         </Button>
-                         <Button variant="destructive" size="sm" onClick={() => handleDeleteSuit(suit.id)} className="w-full sm:w-auto">
-                             <Trash2 className="mr-1 h-4 w-4" /> Excluir
-                         </Button>
-                    </div>
-                  </Card>
-                ))}
+                {returnedSuits.map(suit => renderRentalSuitCard(suit))}
               </div>
             )}
           </TabsContent>
@@ -302,3 +322,4 @@ export default function HomePage() {
     </div>
   );
 }
+

@@ -3,7 +3,7 @@ import Image from 'next/image';
 import type { Suit } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CalendarDays, Edit, Trash2, ImageOff, FileText } from 'lucide-react';
+import { CalendarDays, Edit, Trash2, ImageOff, FileText, CheckCircle2, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { generateReceiptPDF } from '@/lib/pdfGenerator'; // Import the PDF generator
 
@@ -14,10 +14,10 @@ type SuitCardProps = {
 };
 
 export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
-  const isRented = !!suit.customerName && !!suit.deliveryDate && !!suit.returnDate;
+  const hasRentalHistory = !!suit.customerName; // Indicates if the suit was ever rented
 
   const handleGenerateReceipt = () => {
-    if (isRented) {
+    if (hasRentalHistory) { // Receipt can be generated if there's rental history, even if returned
       generateReceiptPDF(suit);
     }
   };
@@ -63,18 +63,33 @@ export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
           <CalendarDays className="mr-1 h-3 w-3" /> Comprado em: {new Date(suit.purchaseDate).toLocaleDateString('pt-BR')}
         </div>
 
+        {hasRentalHistory && suit.isReturned && (
+          <Badge variant="outline" className="mt-2 mb-1 text-xs bg-green-100 text-green-700 border-green-300">
+            <CheckCircle2 className="mr-1 h-3 w-3" /> Devolvido
+          </Badge>
+        )}
+        {hasRentalHistory && !suit.isReturned && (
+          <Badge variant="outline" className="mt-2 mb-1 text-xs bg-yellow-100 text-yellow-700 border-yellow-300">
+             <Clock className="mr-1 h-3 w-3" /> Pendente
+          </Badge>
+        )}
+
         {suit.customerName && (
-          <Badge variant="secondary" className="mt-2">Alugado por: {suit.customerName}</Badge>
+          <p className="text-sm mt-2"><strong>Cliente:</strong> {suit.customerName}</p>
         )}
-        {suit.returnDate && (
-           <p className="text-xs text-muted-foreground mt-1">Devolução: {new Date(suit.returnDate).toLocaleDateString('pt-BR')}</p>
+        {suit.returnDate && !suit.isReturned && ( // Only show return date if pending
+           <p className="text-xs text-muted-foreground mt-1">Devolução em: {new Date(suit.returnDate).toLocaleDateString('pt-BR')}</p>
         )}
+         {suit.returnDate && suit.isReturned && ( // Show actual return date if returned
+           <p className="text-xs text-muted-foreground mt-1">Devolvido em: {new Date(suit.returnDate).toLocaleDateString('pt-BR')}</p>
+        )}
+
       </CardContent>
       <CardFooter className="p-4 border-t flex flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={() => onEdit(suit)} className="flex-grow sm:flex-grow-0">
           <Edit className="mr-1 h-4 w-4" /> Editar
         </Button>
-        {isRented && (
+        {hasRentalHistory && ( // Show receipt button if there's any rental history
           <Button variant="outline" size="sm" onClick={handleGenerateReceipt} className="flex-grow sm:flex-grow-0 w-full sm:w-auto">
             <FileText className="mr-1 h-4 w-4" /> Gerar Recibo
           </Button>
@@ -86,3 +101,4 @@ export function SuitCard({ suit, onEdit, onDelete }: SuitCardProps) {
     </Card>
   );
 }
+

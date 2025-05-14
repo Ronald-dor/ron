@@ -7,6 +7,7 @@ export interface Suit {
   purchaseDate: string; // Store as ISO string date YYYY-MM-DD
   suitPrice: number; // Purchase price of the suit
   rentalPrice: number; // Rental price
+  isReturned?: boolean; // Status of the rental
   
   // Optional fields for current/last rental associated with the suit
   deliveryDate?: string; // Store as ISO string date YYYY-MM-DD
@@ -16,3 +17,4 @@ export interface Suit {
   customerPhone?: string;
   customerEmail?: string;
 }
+

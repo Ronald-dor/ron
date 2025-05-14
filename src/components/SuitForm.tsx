@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
@@ -39,6 +40,7 @@ const suitFormSchema = z.object({
   purchaseDate: z.date({ required_error: "A data da compra é obrigatória." }),
   suitPrice: z.coerce.number().min(0, { message: "O preço do terno deve ser positivo." }),
   rentalPrice: z.coerce.number().min(0, { message: "O preço do aluguel deve ser positivo." }),
+  isReturned: z.boolean().optional(),
   
   deliveryDate: z.date().optional(),
   returnDate: z.date().optional(),
@@ -53,8 +55,6 @@ const suitFormSchema = z.object({
   const hasCustomerPhone = data.customerPhone && data.customerPhone.trim() !== "";
   const hasCustomerEmail = data.customerEmail && data.customerEmail.trim() !== "";
   
-  // If any rental-specific field (delivery/return date) is filled, or any customer field is filled,
-  // then all customer fields and rental dates become mandatory.
   const isAttemptingRental = data.deliveryDate || data.returnDate || hasCustomerName || hasCustomerPhone || hasCustomerEmail;
 
   if (isAttemptingRental) {
@@ -97,6 +97,7 @@ const suitFormSchema = z.object({
     customerEmail: (data.customerEmail && data.customerEmail.trim() !== "") ? data.customerEmail.trim() : undefined,
     observations: (data.observations && data.observations.trim() !== "") ? data.observations.trim() : undefined,
     photoUrl: (data.photoUrl && data.photoUrl.trim() !== "") ? data.photoUrl.trim() : undefined,
+    isReturned: data.isReturned ?? false,
 }));
 
 
@@ -120,6 +121,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
       purchaseDate: new Date(),
       suitPrice: 0,
       rentalPrice: 0,
+      isReturned: false,
       deliveryDate: undefined as Date | undefined,
       returnDate: undefined as Date | undefined,
       observations: "",
@@ -136,6 +138,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
         purchaseDate: initialData.purchaseDate ? parseISO(initialData.purchaseDate) : new Date(),
         suitPrice: initialData.suitPrice ?? 0,
         rentalPrice: initialData.rentalPrice ?? 0,
+        isReturned: initialData.isReturned ?? false,
         deliveryDate: initialData.deliveryDate ? parseISO(initialData.deliveryDate) : undefined,
         returnDate: initialData.returnDate ? parseISO(initialData.returnDate) : undefined,
         customerName: initialData.customerName || "",
@@ -151,6 +154,8 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
     resolver: zodResolver(suitFormSchema),
     defaultValues: memoizedDefaultValues,
   });
+
+  const watchCustomerName = form.watch("customerName");
 
   React.useEffect(() => {
     form.reset(memoizedDefaultValues);
@@ -168,6 +173,7 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
       purchaseDate: format(data.purchaseDate, "yyyy-MM-dd"),
       deliveryDate: data.deliveryDate ? format(data.deliveryDate, "yyyy-MM-dd") : undefined,
       returnDate: data.returnDate ? format(data.returnDate, "yyyy-MM-dd") : undefined,
+      isReturned: data.isReturned ?? false,
     };
     onSubmit(submittedSuit);
     if (fileInputRef.current) {
@@ -413,6 +419,32 @@ export function SuitForm({ onSubmit, initialData, onCancel }: SuitFormProps) {
             </FormItem>
           )}
         />
+        { (watchCustomerName || initialData?.customerName) && (
+            <FormField
+                control={form.control}
+                name="isReturned"
+                render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow">
+                    <FormControl>
+                    <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={!watchCustomerName && !initialData?.customerName}
+                    />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                    <FormLabel>
+                        Terno Devolvido?
+                    </FormLabel>
+                    <FormDescription>
+                        Marque esta opção se o terno já foi devolvido pelo cliente.
+                    </FormDescription>
+                    </div>
+                </FormItem>
+                )}
+            />
+        )}
+
 
         <h3 className="text-lg font-medium border-t pt-4 mt-6">Informações do Cliente</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
