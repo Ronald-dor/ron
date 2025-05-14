@@ -8,13 +8,14 @@ import * as z from 'zod';
 import type { CompanyInfo } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label } from '@/components/ui/label'; // Not strictly needed if using FormLabel everywhere
+import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ScrollArea } from './ui/scroll-area';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, UploadCloud } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
 const companyInfoSchema = z.object({
   name: z.string().min(1, "Nome da empresa é obrigatório."),
@@ -31,6 +32,8 @@ const companyInfoSchema = z.object({
   cnpj: z.string().optional().refine(val => !val || /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/.test(val), {
     message: "Formato de CNPJ inválido (XX.XXX.XXX/XXXX-XX)."
   }),
+  receiptCustomTextTitle: z.string().optional(),
+  receiptCustomText: z.string().optional(),
 });
 
 type CompanyInfoFormValues = z.infer<typeof companyInfoSchema>;
@@ -91,6 +94,8 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
       phone: '',
       email: '',
       cnpj: '',
+      receiptCustomTextTitle: '',
+      receiptCustomText: '',
     },
   });
 
@@ -106,9 +111,11 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
   }, [initialData, form, isOpen]);
 
   const handleSubmit = (data: CompanyInfoFormValues) => {
-    const processedData = {
+    const processedData: CompanyInfo = {
         ...data,
         logoUrl: data.logoUrl || undefined,
+        receiptCustomTextTitle: data.receiptCustomTextTitle?.trim() || undefined,
+        receiptCustomText: data.receiptCustomText?.trim() || undefined,
     }
     onSave(processedData);
     onClose();
@@ -130,7 +137,7 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
             Esses dados serão utilizados nos recibos gerados.
           </SheetDescription>
         </SheetHeader>
-        <ScrollArea className="h-[calc(100vh-150px)]"> {/* Adjust height as needed */}
+        <ScrollArea className="h-[calc(100vh-150px)]"> 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 p-6">
               <FormField
@@ -329,6 +336,31 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
                   </FormItem>
                 )}
               />
+
+              <h3 className="text-md font-medium border-t pt-4 mt-4">Personalização do Recibo</h3>
+               <FormField
+                control={form.control}
+                name="receiptCustomTextTitle"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Título da Seção Personalizada no Recibo (Opcional)</FormLabel>
+                    <FormControl><Input placeholder="Ex: Termos e Condições" {...field} value={field.value || ''} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="receiptCustomText"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Texto Personalizado no Recibo (Opcional)</FormLabel>
+                    <FormControl><Textarea placeholder="Insira aqui termos, condições, agradecimentos ou outras informações..." {...field} value={field.value || ''} rows={5} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <SheetFooter className="p-6 border-t mt-4 sticky bottom-0 bg-background">
                 <SheetClose asChild>
                   <Button type="button" variant="outline">Cancelar</Button>
@@ -342,4 +374,3 @@ export function CompanyInfoSheet({ isOpen, onClose, onSave, initialData }: Compa
     </Sheet>
   );
 }
-

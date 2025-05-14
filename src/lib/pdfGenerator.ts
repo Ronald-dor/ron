@@ -16,8 +16,11 @@ declare module 'jspdf' {
 export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 15;
+  const contentWidth = pageWidth - (2 * margin);
   const centerX = pageWidth / 2;
-  let currentY = 15; 
+  let currentY = margin; 
   const smallLineSpacing = 1.8; 
   const sectionSpacing = 4; 
 
@@ -34,14 +37,13 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
       const logoX = centerX - (logoDisplayWidth / 2);
       
       doc.addImage(companyInfo.logoUrl, 'AUTO', logoX, currentY, logoDisplayWidth, desiredLogoHeight);
-      currentY += desiredLogoHeight + 5; // Add logo height and some padding
+      currentY += desiredLogoHeight + 5; 
     } catch (e) {
       console.error("Erro ao adicionar logo ao PDF:", e);
-      // Fallback or continue without logo
-      currentY += 5; // Add some space even if logo fails, to avoid overlap
+      currentY += 5; 
     }
   } else {
-    currentY = 20; // Default start Y if no logo
+    currentY = 20; 
   }
 
 
@@ -87,7 +89,7 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
 
   // Horizontal Line
   doc.setLineWidth(0.5);
-  doc.line(15, currentY, pageWidth - 15, currentY);
+  doc.line(margin, currentY, pageWidth - margin, currentY);
   currentY += sectionSpacing + 2; 
 
   // Receipt Title
@@ -114,7 +116,7 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
       ['Email do Cliente', suit.customerEmail || 'N/A'],
       ['Data de Entrega', suit.deliveryDate ? format(parseISO(suit.deliveryDate), "PPP", { locale: ptBR }) : 'N/A'],
       ['Data de Devolução', suit.returnDate ? format(parseISO(suit.returnDate), "PPP", { locale: ptBR }) : 'N/A'],
-      ['Observações', suit.observations || 'Nenhuma'],
+      ['Observações do Aluguel', suit.observations || 'Nenhuma'],
     ],
     theme: 'striped', 
     headStyles: { 
@@ -131,17 +133,45 @@ export function generateReceiptPDF(suit: Suit, companyInfo: CompanyInfo) {
       0: { fontStyle: 'bold', cellWidth: 60 },
       1: { cellWidth: 'auto' },
     },
-    margin: { top: 15, right: 15, bottom: 25, left: 15 },
+    margin: { top: margin, right: margin, bottom: 25, left: margin }, // Adjusted bottom margin for footer + custom text
     didDrawPage: (data) => {
-        // Footer
-        const pageCount = doc.getNumberOfPages();
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'italic');
-        doc.text(`${companyInfo.name} - Comprovante de Aluguel`, data.settings.margin.left, doc.internal.pageSize.height - 15);
-        doc.text(`Página ${data.pageNumber} de ${pageCount}`, doc.internal.pageSize.width - data.settings.margin.right, doc.internal.pageSize.height - 15, { align: 'right' });
+      // This is called after the table and before custom text, so we update currentY from here
+      // However, autoTable does not directly return its final Y. We use data.cursor.y for it.
+      // This will be overridden later if custom text is added.
+      let finalY = data.cursor?.y || currentY;
+
+      // Custom Text Section
+      if (companyInfo.receiptCustomText && companyInfo.receiptCustomText.trim() !== '') {
+        finalY += sectionSpacing; // Add some space before the custom text section
+        
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        const customTitle = companyInfo.receiptCustomTextTitle?.trim() || 'Observações Adicionais';
+        doc.text(customTitle, margin, finalY);
+        finalY += doc.getTextDimensions(customTitle).h + 2;
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        const customTextLines = doc.splitTextToSize(companyInfo.receiptCustomText, contentWidth);
+        doc.text(customTextLines, margin, finalY);
+        finalY += (doc.getTextDimensions(customTextLines).h * customTextLines.length) + sectionSpacing;
+      }
+
+
+      // Footer (Page Number and Company Name for Footer)
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      const footerTextY = pageHeight - 15; // Position from bottom
+      doc.text(`${companyInfo.name} - Comprovante de Aluguel`, margin, footerTextY);
+      
+      const pageCount = doc.getNumberOfPages();
+      doc.text(`Página ${data.pageNumber} de ${pageCount}`, pageWidth - margin, footerTextY, { align: 'right' });
     }
   });
+  
+  // Recalculate currentY after autoTable for potential custom text (if not handled by didDrawPage fully)
+  // This part is tricky because autoTable manages its own Y position.
+  // The didDrawPage hook is better for adding content after the table.
 
   doc.save(`recibo_aluguel_${suit.code}_${(suit.customerName || 'cliente').replace(/\s+/g, '_')}.pdf`);
 }
-

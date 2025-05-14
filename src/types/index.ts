@@ -31,5 +31,6 @@ export interface CompanyInfo {
   email: string;
   cnpj?: string;
   logoUrl?: string; // Added for company logo
+  receiptCustomTextTitle?: string; // Title for custom text section on receipt
+  receiptCustomText?: string; // Custom text for receipt (e.g., terms, notes)
 }
-

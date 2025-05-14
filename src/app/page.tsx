@@ -24,7 +24,7 @@ import { ptBR } from 'date-fns/locale';
 
 const defaultCompanyInfo: CompanyInfo = {
   name: 'SuitUp Aluguel de Ternos',
-  logoUrl: '', // Added default for logo
+  logoUrl: '', 
   addressStreet: 'Rua Principal',
   addressNumber: '123',
   addressComplement: 'Sala 10',
@@ -35,6 +35,8 @@ const defaultCompanyInfo: CompanyInfo = {
   phone: '(XX) XXXXX-XXXX',
   email: 'contato@suitup.com',
   cnpj: 'XX.XXX.XXX/0001-XX',
+  receiptCustomTextTitle: 'Observações Adicionais',
+  receiptCustomText: 'Obrigado por escolher nossos serviços! Para dúvidas ou informações, entre em contato.',
 };
 
 export default function HomePage() {
@@ -45,7 +47,7 @@ export default function HomePage() {
   const [suitToDelete, setSuitToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isCompanySheetOpen, setIsCompanySheetOpen] = useState(false);
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(defaultCompanyInfo); // Initialize with default
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>(defaultCompanyInfo);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -63,12 +65,10 @@ export default function HomePage() {
       isReturned: suit.isReturned || false, 
     })));
 
-    // Load company info from localStorage
     const storedCompanyInfo = localStorage.getItem('companyInfo');
     if (storedCompanyInfo) {
       setCompanyInfo(JSON.parse(storedCompanyInfo));
     } else {
-      // If nothing in localStorage, ensure defaultCompanyInfo (which now includes logoUrl) is set
       setCompanyInfo(defaultCompanyInfo); 
     }
   }, []);
@@ -222,12 +222,12 @@ export default function HomePage() {
   };
 
   const handleGenerateReceipt = (suit: Suit) => {
-    if (!companyInfo) { // companyInfo state is now initialized with default
+    if (!companyInfo) { 
        toast({ title: "Erro ao Gerar Recibo", description: `Informações da empresa não configuradas.`, variant: "destructive" });
        return;
     }
     if (suit.customerName) { 
-      generateReceiptPDF(suit, companyInfo); // Pass companyInfo
+      generateReceiptPDF(suit, companyInfo); 
       toast({ title: "Recibo Gerado", description: `O recibo para ${suit.name} foi gerado.` });
     } else {
       toast({ title: "Erro ao Gerar Recibo", description: `Não há informações de aluguel para ${suit.name}.`, variant: "destructive" });
@@ -466,9 +466,8 @@ export default function HomePage() {
         isOpen={isCompanySheetOpen}
         onClose={() => setIsCompanySheetOpen(false)}
         onSave={handleSaveCompanyInfo}
-        initialData={companyInfo} // Pass the state here
+        initialData={companyInfo}
       />
     </div>
   );
 }
-
