@@ -61,7 +61,7 @@ This project now includes the following Firebase configuration files:
 
 *   **Backend Configuration (`frameworksBackend`):**
     *   The `firebase.json` file now includes a `frameworksBackend` section. This allows you to customize settings for the Cloud Run service that Firebase provisions for your Next.js app.
-    *   **`maxInstances`**: This is set to `10` by default in your `firebase.json`. If you encounter errors like "Max instances must be set to 10 or fewer to set the requested memory and CPU", this setting helps resolve it. You can adjust this value based on your needs and Firebase/Cloud Run limits.
+    *   **`maxInstances`**: This is set to `8` in your `firebase.json`. If you encounter errors like "Max instances must be set to 10 or fewer to set the requested memory and CPU", this setting helps resolve it. You can adjust this value based on your needs and Firebase/Cloud Run limits.
     *   Other options like `region`, `minInstances`, `concurrency`, `cpu`, and `memory` can also be set in the `frameworksBackend` object if needed. Refer to Firebase documentation for details.
 *   **Region:** The backend resources (Cloud Run / Cloud Functions Gen 2) will be deployed to a default region (often `us-central1`) unless specified in `frameworksBackend.region`.
 *   **Environment Variables:** If your application requires environment variables (e.g., API keys, database credentials NOT for client-side Firebase SDKs), you'll need to configure them for your Cloud Function/Cloud Run service. You can do this using `firebase functions:secrets:set MY_VARIABLE=secretvalue` (for Cloud Functions Gen 2) or by configuring them in the Cloud Run service settings via the Google Cloud Console. `.env.local` files are not deployed.
