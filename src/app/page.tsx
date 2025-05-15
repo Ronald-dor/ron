@@ -77,7 +77,6 @@ export default function HomePage() {
     if (storedCompanyInfo) {
       try {
         const parsedInfo = JSON.parse(storedCompanyInfo);
-        // Ensure all default fields are present even if not in localStorage
         setCompanyInfo(prev => ({ ...defaultCompanyInfo, ...parsedInfo }));
       } catch (error) {
         console.error("Erro ao carregar informações da empresa do localStorage:", error);
@@ -135,7 +134,7 @@ export default function HomePage() {
     return filterSuitsByName(filtered);
   }, [suits, isMounted, searchTerm]);
 
-  const pendingSuits = useMemo(() => { // Renamed from atrasados, but logic is for overdue
+  const pendingSuits = useMemo(() => { 
     if (!isMounted) return [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -208,13 +207,11 @@ export default function HomePage() {
   const handleFormSubmit = (suitData: Suit) => {
     const processedSuitData: Suit = {
       ...suitData,
-      id: suitData.id || crypto.randomUUID(), // Ensure ID if new
-      photoUrl: suitData.photoUrl || "", // Ensure photoUrl is always a string
-      isReturned: suitData.isReturned || false, // Ensure isReturned default
+      id: suitData.id || crypto.randomUUID(), 
+      photoUrl: suitData.photoUrl || "", 
+      isReturned: suitData.isReturned || false, 
     };
 
-    // If customerName is cleared, ensure rental-specific fields are also cleared for consistency
-    // and isReturned is false.
     if (!processedSuitData.customerName) {
       processedSuitData.deliveryDate = undefined;
       processedSuitData.returnDate = undefined;
