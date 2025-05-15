@@ -77,7 +77,7 @@ export default function HomePage() {
     if (storedCompanyInfo) {
       try {
         const parsedInfo = JSON.parse(storedCompanyInfo);
-        setCompanyInfo({ ...defaultCompanyInfo, ...parsedInfo });
+        setCompanyInfo(prev => ({ ...defaultCompanyInfo, ...parsedInfo, ...prev }));
       } catch (error) {
         console.error("Erro ao carregar informações da empresa do localStorage:", error);
         setCompanyInfo(defaultCompanyInfo); // Fallback para os padrões se houver erro
@@ -485,3 +485,4 @@ export default function HomePage() {
     </div>
   );
 }
+
