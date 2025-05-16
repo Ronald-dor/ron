@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Suit, CompanyInfo } from '@/types';
-import { mockSuits } from '@/data/mockData';
+import { mockSuits as defaultMockSuits } from '@/data/mockData';
 import { AppHeader } from '@/components/AppHeader';
 import { SuitCard } from '@/components/SuitCard';
 import { SuitForm } from '@/components/SuitForm';
@@ -19,7 +19,7 @@ import { exportSuitsToCSV } from '@/lib/export';
 import { generateReceiptPDF } from '@/lib/pdfGenerator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BellRing, Edit, Trash2, FileText, PackageCheck, PackageSearch, Archive, Handshake, CheckCircle2, Clock, Search as SearchIcon } from 'lucide-react';
-import { differenceInCalendarDays, parseISO, format } from 'date-fns';
+import { differenceInCalendarDays, parseISO, format, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
 
@@ -47,6 +47,27 @@ const defaultCompanyInfo: CompanyInfo = {
   receiptTableTheme: 'striped',
 };
 
+const ensureSuitDataIntegrity = (suit: Partial<Suit>): Suit => {
+  const id = suit.id || crypto.randomUUID();
+  return {
+    id: id,
+    code: suit.code || `CODE-${id.substring(0,4)}`,
+    name: suit.name || 'Terno Sem Nome',
+    photoUrl: suit.photoUrl || "",
+    purchaseDate: suit.purchaseDate && isValid(parseISO(suit.purchaseDate)) ? suit.purchaseDate : new Date().toISOString().split('T')[0],
+    suitPrice: typeof suit.suitPrice === 'number' ? suit.suitPrice : 0,
+    rentalPrice: typeof suit.rentalPrice === 'number' ? suit.rentalPrice : 0,
+    customerName: suit.customerName || undefined,
+    customerPhone: suit.customerPhone || undefined,
+    customerEmail: suit.customerEmail || undefined,
+    deliveryDate: suit.deliveryDate && isValid(parseISO(suit.deliveryDate)) ? suit.deliveryDate : undefined,
+    returnDate: suit.returnDate && isValid(parseISO(suit.returnDate)) ? suit.returnDate : undefined,
+    observations: suit.observations || undefined,
+    isReturned: suit.isReturned || false,
+  };
+};
+
+
 export default function HomePage() {
   const [suits, setSuits] = useState<Suit[]>([]);
   const [isMounted, setIsMounted] = useState(false);
@@ -60,37 +81,72 @@ export default function HomePage() {
 
   useEffect(() => {
     setIsMounted(true);
-    setSuits(mockSuits.map(suit => ({
-      ...suit,
-      id: suit.id || crypto.randomUUID(),
-      photoUrl: suit.photoUrl || "",
-      customerName: suit.customerName || undefined,
-      customerPhone: suit.customerPhone || undefined,
-      customerEmail: suit.customerEmail || undefined,
-      deliveryDate: suit.deliveryDate || undefined,
-      returnDate: suit.returnDate || undefined,
-      observations: suit.observations || undefined,
-      isReturned: suit.isReturned || false,
-    })));
 
-    const storedCompanyInfo = localStorage.getItem('companyInfo');
+    // Load Company Info from localStorage
+    const storedCompanyInfo = localStorage.getItem('suitUpCompanyInfo');
     if (storedCompanyInfo) {
       try {
         const parsedInfo = JSON.parse(storedCompanyInfo);
+        // Merge with defaults to ensure all keys are present
         setCompanyInfo(prev => ({ ...defaultCompanyInfo, ...parsedInfo }));
       } catch (error) {
         console.error("Erro ao carregar informações da empresa do localStorage:", error);
-        setCompanyInfo(defaultCompanyInfo);
+        setCompanyInfo(defaultCompanyInfo); // Fallback to defaults
       }
     } else {
-      setCompanyInfo(defaultCompanyInfo);
+      setCompanyInfo(defaultCompanyInfo); // Initialize with defaults if nothing in localStorage
+    }
+
+    // Load Suits from localStorage
+    const storedSuits = localStorage.getItem('suitUpSuits');
+    if (storedSuits) {
+      try {
+        const parsedSuits: Partial<Suit>[] = JSON.parse(storedSuits);
+        setSuits(parsedSuits.map(ensureSuitDataIntegrity));
+      } catch (error) {
+        console.error("Erro ao carregar ternos do localStorage:", error);
+        // Fallback to default mock suits if localStorage data is corrupt
+        setSuits(defaultMockSuits.map(ensureSuitDataIntegrity));
+      }
+    } else {
+      // Initialize with default mock suits if nothing in localStorage
+      setSuits(defaultMockSuits.map(ensureSuitDataIntegrity));
     }
   }, []);
 
+  // Save Suits to localStorage whenever they change
+  useEffect(() => {
+    if (isMounted && suits.length > 0) { // Only save if mounted and suits is not empty (to avoid overwriting on initial load if localStorage was empty)
+      try {
+        localStorage.setItem('suitUpSuits', JSON.stringify(suits));
+      } catch (error) {
+        console.error("Erro ao salvar ternos no localStorage:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao Salvar Dados",
+          description: "Não foi possível salvar as alterações dos ternos localmente.",
+        });
+      }
+    } else if (isMounted && suits.length === 0 && localStorage.getItem('suitUpSuits')) {
+      // If all suits are deleted, clear from localStorage as well
+       localStorage.removeItem('suitUpSuits');
+    }
+  }, [suits, isMounted, toast]);
+
+
   const handleSaveCompanyInfo = (data: CompanyInfo) => {
     setCompanyInfo(data);
-    localStorage.setItem('companyInfo', JSON.stringify(data));
-    toast({ title: "Informações da Empresa Salvas", description: "Os dados da sua empresa foram atualizados." });
+    try {
+      localStorage.setItem('suitUpCompanyInfo', JSON.stringify(data));
+      toast({ title: "Informações da Empresa Salvas", description: "Os dados da sua empresa foram atualizados." });
+    } catch (error) {
+        console.error("Erro ao salvar informações da empresa no localStorage:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao Salvar Dados",
+          description: "Não foi possível salvar as informações da empresa localmente.",
+        });
+    }
   };
 
   const upcomingReturnSuitsForNotification = useMemo(() => {
@@ -102,6 +158,7 @@ export default function HomePage() {
       if (!suit.returnDate || !suit.customerName || suit.isReturned) return false;
       try {
         const returnDateObj = parseISO(suit.returnDate);
+        if (!isValid(returnDateObj)) return false;
         const diffInDays = differenceInCalendarDays(returnDateObj, today);
         return diffInDays === 0 || diffInDays === 1;
       } catch (e) {
@@ -130,7 +187,14 @@ export default function HomePage() {
     if (!isMounted) return [];
     const filtered = suits
       .filter(suit => suit.customerName && !suit.isReturned)
-      .sort((a, b) => (b.deliveryDate && a.deliveryDate ? parseISO(b.deliveryDate).getTime() - parseISO(a.deliveryDate).getTime() : 0));
+      .sort((a, b) => {
+        const dateA = a.deliveryDate ? parseISO(a.deliveryDate) : null;
+        const dateB = b.deliveryDate ? parseISO(b.deliveryDate) : null;
+        if (dateA && dateB && isValid(dateA) && isValid(dateB)) {
+          return dateB.getTime() - dateA.getTime();
+        }
+        return 0;
+      });
     return filterSuitsByName(filtered);
   }, [suits, isMounted, searchTerm]);
 
@@ -144,13 +208,21 @@ export default function HomePage() {
         if (!suit.customerName || suit.isReturned || !suit.returnDate) return false;
         try {
           const returnDateObj = parseISO(suit.returnDate);
+          if (!isValid(returnDateObj)) return false;
           return differenceInCalendarDays(returnDateObj, today) < 0;
         } catch (e) {
           console.error("Erro ao analisar data de devolução para atrasados:", suit.returnDate, e);
           return false;
         }
       })
-      .sort((a, b) => (a.returnDate && b.returnDate ? parseISO(a.returnDate).getTime() - parseISO(b.returnDate).getTime() : 0));
+      .sort((a, b) => {
+        const dateA = a.returnDate ? parseISO(a.returnDate) : null;
+        const dateB = b.returnDate ? parseISO(b.returnDate) : null;
+        if (dateA && dateB && isValid(dateA) && isValid(dateB)) {
+          return dateA.getTime() - dateB.getTime();
+        }
+        return 0;
+      });
     return filterSuitsByName(filtered);
   }, [suits, isMounted, searchTerm]);
 
@@ -158,7 +230,14 @@ export default function HomePage() {
     if (!isMounted) return [];
     const filtered = suits
       .filter(suit => suit.customerName && suit.isReturned)
-      .sort((a,b) => (b.returnDate && a.returnDate ? parseISO(b.returnDate).getTime() - parseISO(a.returnDate).getTime() : 0));
+      .sort((a,b) => {
+        const dateA = a.returnDate ? parseISO(a.returnDate) : null;
+        const dateB = b.returnDate ? parseISO(b.returnDate) : null;
+        if (dateA && dateB && isValid(dateA) && isValid(dateB)) {
+          return dateB.getTime() - dateA.getTime();
+        }
+        return 0;
+      });
     return filterSuitsByName(filtered);
   }, [suits, isMounted, searchTerm]);
 
@@ -169,6 +248,7 @@ export default function HomePage() {
     today.setHours(0, 0, 0, 0);
     try {
       const returnDateObj = parseISO(returnDateStr);
+      if (!isValid(returnDateObj)) return "Data inválida";
       const diff = differenceInCalendarDays(returnDateObj, today);
 
       if (diff < 0) return `Atrasado (${Math.abs(diff)} dia${Math.abs(diff) !== 1 ? 's' : ''})`;
@@ -205,12 +285,7 @@ export default function HomePage() {
   };
 
   const handleFormSubmit = (suitData: Suit) => {
-    const processedSuitData: Suit = {
-      ...suitData,
-      id: suitData.id || crypto.randomUUID(), 
-      photoUrl: suitData.photoUrl || "", 
-      isReturned: suitData.isReturned || false, 
-    };
+    const processedSuitData: Suit = ensureSuitDataIntegrity(suitData);
 
     if (!processedSuitData.customerName) {
       processedSuitData.deliveryDate = undefined;
@@ -226,7 +301,7 @@ export default function HomePage() {
       setSuits(prevSuits => prevSuits.map(s => (s.id === processedSuitData.id ? processedSuitData : s)));
       toast({ title: "Terno Atualizado", description: `${processedSuitData.name} foi atualizado.` });
     } else {
-      setSuits(prevSuits => [...prevSuits, processedSuitData]);
+      setSuits(prevSuits => [processedSuitData, ...prevSuits]); // Add to the beginning for better UX
       toast({ title: "Terno Adicionado", description: `${processedSuitData.name} foi adicionado ao catálogo.` });
     }
     setIsFormOpen(false);
@@ -263,7 +338,7 @@ export default function HomePage() {
     );
     toast({
       title: "Status Atualizado",
-      description: `O terno ${suitToToggle.name} foi marcado como ${!suitToToggle.isReturned ? 'Devolvido' : 'Pendente'}.`,
+      description: `O terno ${suitToToggle.name} foi marcado como ${!suitToToggle.isReturned ? 'Devolvido' : 'Pendente de Devolução'}.`,
     });
   };
 
@@ -304,11 +379,19 @@ export default function HomePage() {
     );
   };
 
-  const renderRentalSuitCard = (suit: Suit) => (
+  const renderRentalSuitCard = (suit: Suit) => {
+    const returnDateObj = suit.returnDate ? parseISO(suit.returnDate) : null;
+    const isValidReturnDate = returnDateObj && isValid(returnDateObj);
+
+    return (
       <Card key={`rental-${suit.id}`} className="p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col sm:flex-row gap-4 items-start">
-          {suit.photoUrl && (
+          {suit.photoUrl ? (
             <div className="w-full sm:w-24 h-32 sm:h-auto sm:aspect-[3/4] relative bg-muted rounded overflow-hidden flex-shrink-0">
                 <Image src={suit.photoUrl} alt={suit.name} className="w-full h-full object-cover" data-ai-hint="suit fashion" fill />
+            </div>
+          ) : (
+            <div className="w-full sm:w-24 h-32 sm:h-auto sm:aspect-[3/4] relative bg-muted rounded overflow-hidden flex-shrink-0 flex items-center justify-center">
+                 <PackageSearch className="w-12 h-12 text-muted-foreground" /> {/* Placeholder Icon */}
             </div>
           )}
         <div className="flex-grow">
@@ -317,14 +400,14 @@ export default function HomePage() {
           </CardHeader>
           <CardContent className="p-0 text-sm space-y-1">
             <p><strong>Cliente:</strong> {suit.customerName}</p>
-            <p><strong>Data de Devolução:</strong> <span className={`font-semibold ${!suit.isReturned && suit.returnDate && differenceInCalendarDays(parseISO(suit.returnDate), new Date().setHours(0,0,0,0)) < 0 ? 'text-destructive' : (suit.isReturned ? 'text-green-600' : '')}`}>{suit.returnDate ? format(parseISO(suit.returnDate), "PPP", { locale: ptBR }) : "N/A"}</span> {!suit.isReturned && suit.returnDate && `(${getDaysRemainingText(suit.returnDate)})`}</p>
+            <p><strong>Data de Devolução:</strong> <span className={`font-semibold ${!suit.isReturned && isValidReturnDate && differenceInCalendarDays(returnDateObj, new Date().setHours(0,0,0,0)) < 0 ? 'text-destructive' : (suit.isReturned ? 'text-green-600' : '')}`}>{isValidReturnDate ? format(returnDateObj, "PPP", { locale: ptBR }) : "N/A"}</span> {!suit.isReturned && isValidReturnDate && `(${getDaysRemainingText(suit.returnDate)})`}</p>
             <p><strong>Preço do Aluguel:</strong> R$ {suit.rentalPrice.toFixed(2).replace('.', ',')}</p>
             {suit.customerPhone && <p><strong>Telefone:</strong> {suit.customerPhone}</p>}
             {suit.customerEmail && <p><strong>Email:</strong> {suit.customerEmail}</p>}
              {suit.isReturned ? (
                 <p className="text-xs font-semibold text-green-600">Status: Devolvido</p>
             ) : (
-                <p className="text-xs font-semibold text-yellow-600">Status: Pendente</p>
+                <p className="text-xs font-semibold text-yellow-600">Status: Pendente de Devolução</p>
             )}
             {suit.observations && <p className="mt-1 text-xs"><strong>Obs:</strong> {suit.observations}</p>}
           </CardContent>
@@ -350,7 +433,7 @@ export default function HomePage() {
               </Button>
         </div>
       </Card>
-  );
+  )};
 
 
   return (
@@ -368,7 +451,7 @@ export default function HomePage() {
                   <ReminderCardTitle className="text-md font-semibold mb-1">{suit.name} <span className="text-sm font-normal text-muted-foreground">(Cód: {suit.code})</span></ReminderCardTitle>
                   <CardContent className="p-0 text-sm space-y-0.5">
                     <p><strong>Cliente:</strong> {suit.customerName}</p>
-                    <p><strong>Data de Devolução:</strong> <span className="font-semibold text-destructive">{suit.returnDate ? format(parseISO(suit.returnDate), "PPP", { locale: ptBR }) : "N/A"}</span> {suit.returnDate && `(${getDaysRemainingText(suit.returnDate)})`}</p>
+                    <p><strong>Data de Devolução:</strong> <span className="font-semibold text-destructive">{suit.returnDate && isValid(parseISO(suit.returnDate)) ? format(parseISO(suit.returnDate), "PPP", { locale: ptBR }) : "N/A"}</span> {suit.returnDate && `(${getDaysRemainingText(suit.returnDate)})`}</p>
                     {suit.customerPhone && <p><strong>Telefone:</strong> {suit.customerPhone}</p>}
                     {suit.customerEmail && <p><strong>Email:</strong> {suit.customerEmail}</p>}
                   </CardContent>
@@ -404,8 +487,8 @@ export default function HomePage() {
           <TabsContent value="alugados-suits">
             {alugadosSuits.length === 0 ? (
               <div className="text-center py-10">
-                <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno alugado no momento.</h2>
-                <p className="text-muted-foreground mt-2">{searchTerm ? "Nenhum terno alugado encontrado com este nome." : "Não há ternos atualmente em processo de aluguel."}</p>
+                <h2 className="text-2xl font-semibold text-muted-foreground">Nenhum terno atualmente alugado.</h2>
+                <p className="text-muted-foreground mt-2">{searchTerm ? "Nenhum terno alugado encontrado com este nome." : "Não há ternos em processo de aluguel neste momento."}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -492,4 +575,4 @@ export default function HomePage() {
     </div>
   );
 }
-
+    
